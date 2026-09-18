@@ -1,0 +1,211 @@
+export const CATEGORIES = [
+  { id: "elektronika", label: "Elektronika" },
+  { id: "ubrania", label: "Ubrania" },
+  { id: "dom", label: "Dom" },
+  { id: "jedzenie", label: "Jedzenie" },
+  { id: "podroz", label: "Podróż" },
+  { id: "hobby", label: "Hobby" },
+  { id: "inne", label: "Inne" },
+] as const;
+
+export type CategoryId = (typeof CATEGORIES)[number]["id"];
+
+export const WAIT_OPTIONS = [
+  { hours: 24, label: "24 godziny", plus: true },
+  { hours: 48, label: "48 godzin", plus: false },
+  { hours: 72, label: "3 dni", plus: true },
+  { hours: 168, label: "7 dni", plus: true },
+  { hours: 336, label: "14 dni", plus: true },
+  { hours: 720, label: "30 dni", plus: true },
+] as const;
+
+export type PlanId = "free" | "plus_month" | "plus_year";
+
+export const PLANS: Record<
+  PlanId,
+  {
+    id: PlanId;
+    name: string;
+    priceGrosze: number;
+    periodDays: number;
+    priceLabel: string;
+    periodLabel: string;
+    blurb: string;
+    features: string[];
+  }
+> = {
+  free: {
+    id: "free",
+    name: "Darmowy",
+    priceGrosze: 0,
+    periodDays: 0,
+    priceLabel: "0 zł",
+    periodLabel: "zawsze",
+    blurb: "Żeby sprawdzić, czy odczekiwanie w ogóle działa.",
+    features: [
+      "5 rzeczy naraz w poczekalni",
+      "Stałe 48 godzin oddechu",
+      "Werdykt: kupuję albo odpuszczam",
+      "Historia decyzji",
+    ],
+  },
+  plus_month: {
+    id: "plus_month",
+    name: "Plus",
+    priceGrosze: 900,
+    periodDays: 30,
+    priceLabel: "9 zł",
+    periodLabel: "miesiąc",
+    blurb: "Bez limitu i z własnym tempem. Tyle co kawa na mieście.",
+    features: [
+      "Bez limitu rzeczy w poczekalni",
+      "Czas oddechu od 24 h do 30 dni",
+      "Raport: ile nie wydałaś / nie wydałeś",
+      "Przelicznik na godziny twojej pracy",
+    ],
+  },
+  plus_year: {
+    id: "plus_year",
+    name: "Plus rocznie",
+    priceGrosze: 7900,
+    periodDays: 365,
+    priceLabel: "79 zł",
+    periodLabel: "rok",
+    blurb: "Dwa miesiące w prezencie. Wychodzi 6,58 zł miesięcznie.",
+    features: [
+      "Wszystko z planu Plus",
+      "Płatność raz, spokój na rok",
+      "29 zł taniej niż 12 × 9 zł",
+    ],
+  },
+};
+
+export const FREE_WAIT_LIMIT = 5;
+export const FREE_WAIT_HOURS = 48;
+
+export type ItemStatus = "waiting" | "bought" | "skipped";
+
+export type WaitItem = {
+  id: string;
+  title: string;
+  amountGrosze: number;
+  category: CategoryId;
+  note: string;
+  waitHours: number;
+  createdAt: string;
+  readyAt: string;
+  status: ItemStatus;
+  verdictAt?: string;
+};
+
+export type Profile = {
+  displayName: string;
+  monthlyIncomeGrosze: number | null;
+  monthlyHours: number;
+};
+
+export type Entitlements = {
+  plan: PlanId;
+  plus: boolean;
+  periodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+};
+
+export type Review = {
+  stars: number;
+  body: string;
+  displayName: string;
+  createdAt: string;
+};
+
+export const SUGGESTIONS: {
+  title: string;
+  amountZl: number;
+  category: CategoryId;
+}[] = [
+  { title: "AirPods", amountZl: 899, category: "elektronika" },
+  { title: "Kurtka na jesień", amountZl: 429, category: "ubrania" },
+  { title: "Kolacja", amountZl: 260, category: "jedzenie" },
+  { title: "Bilet na mecz", amountZl: 190, category: "hobby" },
+  { title: "Krem", amountZl: 348, category: "inne" },
+  { title: "Słuchawki nauszne", amountZl: 649, category: "elektronika" },
+  { title: "Weekend w Gdańsku", amountZl: 1180, category: "podroz" },
+  { title: "Buty", amountZl: 519, category: "ubrania" },
+  { title: "Lampa", amountZl: 279, category: "dom" },
+  { title: "Gra", amountZl: 249, category: "hobby" },
+];
+
+export function categoryLabel(id: string): string {
+  return CATEGORIES.find((c) => c.id === id)?.label ?? id;
+}
+
+export function formatZl(grosze: number): string {
+  const zl = grosze / 100;
+  return (
+    zl.toLocaleString("pl-PL", {
+      minimumFractionDigits: zl % 1 === 0 ? 0 : 2,
+      maximumFractionDigits: 2,
+    }) + " zł"
+  );
+}
+
+export function parseAmountToGrosze(raw: string): number | null {
+  const normalized = raw.trim().replace(/\s/g, "").replace(",", ".");
+  if (!normalized) return null;
+  const n = Number(normalized);
+  if (!Number.isFinite(n) || n <= 0 || n > 1_000_000) return null;
+  return Math.round(n * 100);
+}
+
+export function hoursOfWork(
+  amountGrosze: number,
+  monthlyIncomeGrosze: number | null,
+  monthlyHours: number,
+): number | null {
+  if (!monthlyIncomeGrosze || monthlyIncomeGrosze <= 0 || monthlyHours <= 0) {
+    return null;
+  }
+  const rate = monthlyIncomeGrosze / monthlyHours;
+  if (rate <= 0) return null;
+  return amountGrosze / rate;
+}
+
+export function formatHours(hours: number): string {
+  if (hours < 1) return `${Math.max(1, Math.round(hours * 60))} min`;
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return m === 0 ? `${h} godz.` : `${h} godz. ${m} min`;
+}
+
+export function formatRemaining(ms: number): string {
+  const hours = Math.floor(ms / 3_600_000);
+  const days = Math.floor(hours / 24);
+  if (days >= 1) {
+    const rest = hours % 24;
+    return rest ? `${days} d. ${rest} godz.` : `${days} d.`;
+  }
+  if (hours >= 1) return `${hours} godz.`;
+  return `${Math.max(1, Math.round(ms / 60_000))} min`;
+}
+
+export function pluralPl(n: number, one: string, few: string, many: string): string {
+  const abs = Math.abs(n);
+  const mod10 = abs % 10;
+  const mod100 = abs % 100;
+  if (abs === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
+
+export const DEFAULT_PROFILE: Profile = {
+  displayName: "",
+  monthlyIncomeGrosze: null,
+  monthlyHours: 160,
+};
+
+export const DEFAULT_ENTITLEMENTS: Entitlements = {
+  plan: "free",
+  plus: false,
+  periodEnd: null,
+  cancelAtPeriodEnd: false,
+};
