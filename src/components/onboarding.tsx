@@ -1,26 +1,50 @@
 import { Button } from "@/components/ui/button";
 import { PauseBars } from "@/components/pause-bars";
+import { ZMark } from "@/components/mark";
 import { useZanim } from "@/lib/store";
 
 export function Onboarding() {
   const finish = useZanim((s) => s.finishOnboarding);
   return (
-    <div className="flex min-h-dvh flex-col justify-between px-5 pb-8 pt-[max(2rem,env(safe-area-inset-top))]">
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-between px-6 pb-10 pt-[max(2rem,env(safe-area-inset-top))]">
       <div>
-        <p className="text-2xs font-medium uppercase tracking-mark text-subtle">Zanim</p>
-        <h1 className="mt-3 font-serif text-3xl font-medium leading-tight">
-          Odczekaj, zanim wydasz
+        <div className="flex items-center gap-2">
+          <ZMark />
+          <span className="text-2xs font-semibold uppercase tracking-mark text-subtle">Zanim</span>
+        </div>
+        <h1 className="rise-in mt-8 font-serif text-[2.15rem] font-medium leading-[1.15] tracking-tight">
+          Kupuj z głową,
+          <br />
+          nie z impulsem
         </h1>
-        <p className="mt-4 text-base leading-relaxed text-muted">
-          Wrzuć rzecz do poczekalni na 48 godzin. Jak czas minie — kupujesz albo odpuszczasz.
-          Bez pośpiechu, bez impulsu.
+        <p className="rise-in-2 mt-4 max-w-sm text-[15px] leading-relaxed text-muted">
+          Wrzuć rzecz do poczekalni na 48 godzin. Jak czas minie — decydujesz: kupujesz albo
+          odpuszczasz. Prosto, bez presji.
         </p>
-        <div className="mt-10 flex justify-center text-fg">
+
+        <div className="rise-in-3 mt-10 grid gap-3">
+          {[
+            { t: "48 godzin oddechu", d: "Zanim klikniesz „kup”, daj sobie czas." },
+            { t: "Werdykt na spokojnie", d: "Kupuję albo odpuszczam — Ty wybierasz." },
+            { t: "Raport oszczędności", d: "Zobacz, ile nie wydałaś / nie wydałeś." },
+          ].map((item) => (
+            <div
+              key={item.t}
+              className="rounded-2xl border border-line/70 bg-surface/90 px-4 py-3.5 shadow-card"
+            >
+              <p className="font-medium">{item.t}</p>
+              <p className="mt-0.5 text-sm text-muted">{item.d}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="float-soft mt-12 flex justify-center text-fg opacity-90">
           <PauseBars />
         </div>
       </div>
-      <Button className="w-full" size="lg" onClick={finish}>
-        Zaczynam
+
+      <Button className="mt-10 w-full rounded-xl" size="lg" onClick={finish}>
+        Zaczynam odczekiwanie
       </Button>
     </div>
   );

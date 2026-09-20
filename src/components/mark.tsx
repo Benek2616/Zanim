@@ -4,7 +4,7 @@ export function ZMark({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "grid size-8 place-items-center rounded-sm bg-fg font-serif text-sm font-medium text-accent-fg",
+        "grid size-8 place-items-center rounded-xl bg-fg font-serif text-sm font-semibold text-accent-fg shadow-soft",
         className,
       )}
       aria-hidden="true"
