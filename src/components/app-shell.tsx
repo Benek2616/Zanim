@@ -20,15 +20,25 @@ function isTabActive(to: string, pathname: string): boolean {
   return ["/konto", "/opinie", "/na-telefon", "/prywatnosc", "/regulamin"].includes(pathname);
 }
 
+function applyDarkClass(dark: boolean) {
+  if (typeof document === "undefined") return;
+  document.documentElement.classList.toggle("dark", dark);
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const hydrated = useZanim((s) => s.hydrated);
   const onboardingDone = useZanim((s) => s.onboardingDone);
+  const darkMode = useZanim((s) => s.darkMode);
   const markHydrated = useZanim((s) => s.markHydrated);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
     void Promise.resolve(useZanim.persist.rehydrate()).then(() => markHydrated());
   }, [markHydrated]);
+
+  useEffect(() => {
+    applyDarkClass(darkMode);
+  }, [darkMode]);
 
   if (!hydrated) {
     return (
@@ -49,7 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
-      <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-line/60 bg-bg-top/80 px-5 pb-3 pt-[max(0.85rem,env(safe-area-inset-top))] backdrop-blur-md">
+      <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-line/60 bg-bg/80 px-5 pb-3 pt-[max(0.85rem,env(safe-area-inset-top))] backdrop-blur-md">
         <Link to="/" className="flex items-center gap-2.5 text-fg">
           <ZMark />
           <span className="font-serif text-lg font-medium tracking-tight">Zanim</span>

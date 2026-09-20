@@ -18,12 +18,14 @@ import {
 export type ZanimState = {
   hydrated: boolean;
   onboardingDone: boolean;
+  darkMode: boolean;
   items: WaitItem[];
   profile: Profile;
   entitlements: Entitlements;
   review: Review | null;
   markHydrated: () => void;
   finishOnboarding: () => void;
+  setDarkMode: (value: boolean) => void;
   addItem: (input: {
     title: string;
     amountGrosze: number;
@@ -57,12 +59,14 @@ export const useZanim = create<ZanimState>()(
     (set, get) => ({
       hydrated: false,
       onboardingDone: false,
+      darkMode: false,
       items: [],
       profile: DEFAULT_PROFILE,
       entitlements: DEFAULT_ENTITLEMENTS,
       review: null,
       markHydrated: () => set({ hydrated: true }),
       finishOnboarding: () => set({ onboardingDone: true }),
+      setDarkMode: (value) => set({ darkMode: value }),
       addItem: (input) => {
         const { items, entitlements } = get();
         const plus = plusActive(entitlements);
@@ -145,6 +149,7 @@ export const useZanim = create<ZanimState>()(
       skipHydration: true,
       partialize: (state) => ({
         onboardingDone: state.onboardingDone,
+        darkMode: state.darkMode,
         items: state.items,
         profile: state.profile,
         entitlements: state.entitlements,
