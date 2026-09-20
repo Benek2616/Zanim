@@ -10,7 +10,13 @@ import {
   setAppBadge,
 } from "@/lib/notify";
 import { isPlusActive, useZanim } from "@/lib/store";
-import { formatZl, skipStreakDays, SUGGESTIONS } from "@/lib/zanim";
+import {
+  formatZl,
+  skipStreakDays,
+  SUGGESTIONS,
+  weekSkippedSum,
+  type SkipReasonId,
+} from "@/lib/zanim";
 
 export const Route = createFileRoute("/")({ component: Home });
 
@@ -18,24 +24,24 @@ type Filter = "all" | "ready" | "waiting";
 
 const TIPS = [
   {
-    tag: "Nowość",
-    title: "Cel oszczędności",
-    body: "Ustaw cel w Więcej → Profil. Raport pokaże postęp przy każdym odpuszczeniu.",
+    tag: "Psychologia",
+    title: "Impuls lubi pośpiech",
+    body: "48 godzin przerywa automat. Część chęci gaśnie sama — to nie słabość, to biologia.",
   },
   {
-    tag: "Wskazówka",
-    title: "48 godzin to nie kara",
-    body: "To przerwa na oddech. Większość impulsów mija, zanim skończy się timer.",
+    tag: "Cel",
+    title: "Ustaw cel oszczędności",
+    body: "Więcej → Profil. Każde odpuszczenie przybliża Cię do kwoty, nie tylko do „lepszego jutra”.",
   },
   {
     tag: "Passa",
     title: "Dni z odpuszczeniem",
-    body: "Buduj passę: każdego dnia, w którym coś odpuścisz, licznik rośnie.",
+    body: "Buduj passę: dzień, w którym coś odpuścisz, liczy się do serii.",
   },
   {
     tag: "Na telefon",
     title: "Zainstaluj na ekranie",
-    body: "Działa jak aplikacja, także offline. Zobacz Więcej → Menu → Na telefon.",
+    body: "Więcej → Menu → Na telefon. Działa jak aplikacja, także offline.",
   },
 ];
 
@@ -78,6 +84,8 @@ function Home() {
   );
   const plus = isPlusActive(entitlements);
   const streak = useMemo(() => skipStreakDays(items), [items]);
+  const thisWeek = useMemo(() => weekSkippedSum(items, 0), [items]);
+  const lastWeek = useMemo(() => weekSkippedSum(items, 1), [items]);
   const goal = profile.savingsGoalGrosze;
   const goalPct =
     goal && goal > 0 ? Math.min(100, Math.round((skippedSum / goal) * 100)) : null;
@@ -100,6 +108,10 @@ function Home() {
   }, [ready]);
 
   const tip = TIPS[tipIndex];
+
+  function onSkip(id: string, reason?: SkipReasonId) {
+    decide(id, "skipped", reason);
+  }
 
   return (
     <div className="pb-4">
@@ -129,10 +141,29 @@ function Home() {
         </div>
       </div>
 
+      {/* Ten tydzień */}
+      <div className="mt-4 rounded-2xl border border-line/60 bg-surface p-4 shadow-card">
+        <p className="text-2xs font-semibold uppercase tracking-mark text-subtle">Ten tydzień</p>
+        <div className="mt-2 flex items-end justify-between gap-3">
+          <div>
+            <p className="font-serif text-2xl font-medium text-saved">{formatZl(thisWeek)}</p>
+            <p className="mt-0.5 text-xs text-muted">odpuszczone</p>
+          </div>
+          <p className="text-right text-xs text-muted">
+            Poprzedni tydzień
+            <br />
+            <span className="text-sm font-medium text-fg">{formatZl(lastWeek)}</span>
+          </p>
+        </div>
+      </div>
+
       <div className="rise-in-3 mt-4 grid grid-cols-3 gap-2.5">
         <Stat label="W poczekalni" value={String(waiting.length)} />
         <Stat label="Odpuszczone" value={formatZl(skippedSum)} saved />
-        <Stat label={streak > 0 ? "Passa" : "Plan"} value={streak > 0 ? `${streak} d.` : plus ? "Plus" : "Darmowy"} />
+        <Stat
+          label={streak > 0 ? "Passa" : "Plan"}
+          value={streak > 0 ? `${streak} d.` : plus ? "Plus" : "Darmowy"}
+        />
       </div>
 
       {goalPct != null && goal ? (
@@ -252,7 +283,7 @@ function Home() {
                 now={now}
                 profile={profile}
                 onBuy={() => decide(item.id, "bought")}
-                onSkip={() => decide(item.id, "skipped")}
+                onSkip={(reason) => onSkip(item.id, reason)}
                 onExtend={() => extend(item.id)}
                 onRemove={() => remove(item.id)}
               />
