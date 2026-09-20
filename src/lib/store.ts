@@ -12,6 +12,7 @@ import {
   type PlanId,
   type Profile,
   type Review,
+  type SkipReasonId,
   type WaitItem,
 } from "@/lib/zanim";
 
@@ -24,6 +25,12 @@ function normalizeProfile(p: Partial<Profile> | Profile | undefined): Profile {
   };
 }
 
+export type PendingUndo = {
+  itemId: string;
+  snapshot: WaitItem;
+  expiresAt: number;
+};
+
 export type ZanimState = {
   hydrated: boolean;
   onboardingDone: boolean;
@@ -33,10 +40,13 @@ export type ZanimState = {
   entitlements: Entitlements;
   review: Review | null;
   lastToast: string | null;
+  pendingUndo: PendingUndo | null;
+  lastSkipId: string | null;
   markHydrated: () => void;
   finishOnboarding: () => void;
   setDarkMode: (value: boolean) => void;
   clearToast: () => void;
+  clearLastSkip: () => void;
   addItem: (input: {
     title: string;
     amountGrosze: number;
@@ -44,7 +54,12 @@ export type ZanimState = {
     note: string;
     waitHours: number;
   }) => { ok: true; id: string } | { ok: false; error: string; code: "limit" | "plus" };
-  decide: (id: string, status: Exclude<ItemStatus, "waiting">) => void;
+  decide: (
+    id: string,
+    status: Exclude<ItemStatus, "waiting">,
+    skipReason?: SkipReasonId,
+  ) => void;
+  undoLast: () => void;
   extend: (id: string) => void;
   remove: (id: string) => void;
   setProfile: (patch: Partial<Profile>) => void;
@@ -76,10 +91,13 @@ export const useZanim = create<ZanimState>()(
       entitlements: DEFAULT_ENTITLEMENTS,
       review: null,
       lastToast: null,
+      pendingUndo: null,
+      lastSkipId: null,
       markHydrated: () => set({ hydrated: true }),
       finishOnboarding: () => set({ onboardingDone: true }),
       setDarkMode: (value) => set({ darkMode: value }),
       clearToast: () => set({ lastToast: null }),
+      clearLastSkip: () => set({ lastSkipId: null }),
       addItem: (input) => {
         const { items, entitlements } = get();
         const plus = plusActive(entitlements);
@@ -110,20 +128,40 @@ export const useZanim = create<ZanimState>()(
         set({ items: [item, ...items], lastToast: `„${item.title}” w poczekalni` });
         return { ok: true, id: item.id };
       },
-      decide: (id, status) => {
+      decide: (id, status, skipReason) => {
         const item = get().items.find((i) => i.id === id);
+        if (!item || item.status !== "waiting") return;
+        const snapshot = { ...item };
         set({
           items: get().items.map((i) =>
-            i.id === id && i.status === "waiting"
-              ? { ...i, status, verdictAt: new Date().toISOString() }
+            i.id === id
+              ? {
+                  ...i,
+                  status,
+                  verdictAt: new Date().toISOString(),
+                  skipReason: status === "skipped" ? skipReason : undefined,
+                }
               : i,
           ),
+          pendingUndo: { itemId: id, snapshot, expiresAt: Date.now() + 10_000 },
+          lastSkipId: status === "skipped" ? id : get().lastSkipId,
           lastToast:
-            item && status === "skipped"
-              ? `Odpuszczasz ${item.title} — brawo`
-              : item && status === "bought"
-                ? `Kupujesz ${item.title}`
-                : null,
+            status === "skipped"
+              ? `Odpuszczasz ${item.title}`
+              : `Kupujesz ${item.title}`,
+        });
+      },
+      undoLast: () => {
+        const u = get().pendingUndo;
+        if (!u || Date.now() > u.expiresAt) {
+          set({ pendingUndo: null });
+          return;
+        }
+        set({
+          items: get().items.map((i) => (i.id === u.itemId ? { ...u.snapshot } : i)),
+          pendingUndo: null,
+          lastSkipId: null,
+          lastToast: "Cofnięto decyzję",
         });
       },
       extend: (id) => {
@@ -176,6 +214,8 @@ export const useZanim = create<ZanimState>()(
           profile: normalizeProfile(p.profile ?? current.profile),
           hydrated: false,
           lastToast: null,
+          pendingUndo: null,
+          lastSkipId: null,
         };
       },
       partialize: (state) => ({

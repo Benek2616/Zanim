@@ -19,6 +19,17 @@ export const WAIT_OPTIONS = [
   { hours: 720, label: "30 dni", plus: true },
 ] as const;
 
+export const SKIP_REASONS = [
+  { id: "drogo", label: "Za drogie" },
+  { id: "nie_potrzebuje", label: "Nie potrzebuję" },
+  { id: "emocje", label: "To były emocje" },
+  { id: "taniej", label: "Znajdę taniej" },
+  { id: "poczekam", label: "Jeszcze poczekam" },
+  { id: "inne", label: "Inny powód" },
+] as const;
+
+export type SkipReasonId = (typeof SKIP_REASONS)[number]["id"];
+
 export type PlanId = "free" | "plus_month" | "plus_year";
 
 export const PLANS: Record<
@@ -96,13 +107,13 @@ export type WaitItem = {
   readyAt: string;
   status: ItemStatus;
   verdictAt?: string;
+  skipReason?: SkipReasonId;
 };
 
 export type Profile = {
   displayName: string;
   monthlyIncomeGrosze: number | null;
   monthlyHours: number;
-  /** Cel oszczędności w groszach; null = wyłączony */
   savingsGoalGrosze: number | null;
 };
 
@@ -135,6 +146,13 @@ export const SUGGESTIONS: {
   { title: "Buty", amountZl: 519, category: "ubrania" },
   { title: "Lampa", amountZl: 279, category: "dom" },
   { title: "Gra", amountZl: 249, category: "hobby" },
+];
+
+export const PSYCHO_TIPS = [
+  "Kupujesz rzecz — czy nastrój?",
+  "Za 48 godzin ta chęć może być słabsza. To normalne.",
+  "Okazja rzadko znika na zawsze. Impuls mija szybciej.",
+  "Policz: ile godzin pracy kosztuje ten zakup?",
 ];
 
 export function categoryLabel(id: string): string {
@@ -197,7 +215,6 @@ export function pluralPl(n: number, one: string, few: string, many: string): str
   return many;
 }
 
-/** Passa: kolejne dni z co najmniej jednym "odpuszczam". */
 export function skipStreakDays(items: WaitItem[]): number {
   const days = new Set(
     items
@@ -224,6 +241,36 @@ export function skipStreakDays(items: WaitItem[]): number {
     d.setDate(d.getDate() - 1);
   }
   return streak;
+}
+
+/** Sugerowany czas oddechu wg kwoty (grosze). */
+export function suggestedWaitHours(amountGrosze: number): number {
+  if (amountGrosze >= 100_000) return 168; // 7 dni
+  if (amountGrosze >= 50_000) return 72;
+  if (amountGrosze >= 20_000) return 48;
+  return 48;
+}
+
+function startOfWeek(d = new Date()): Date {
+  const x = new Date(d);
+  const day = (x.getDay() + 6) % 7; // poniedziałek = 0
+  x.setHours(0, 0, 0, 0);
+  x.setDate(x.getDate() - day);
+  return x;
+}
+
+export function weekSkippedSum(items: WaitItem[], weeksAgo = 0): number {
+  const start = startOfWeek();
+  start.setDate(start.getDate() - weeksAgo * 7);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+  return items
+    .filter((i) => {
+      if (i.status !== "skipped" || !i.verdictAt) return false;
+      const t = new Date(i.verdictAt).getTime();
+      return t >= start.getTime() && t < end.getTime();
+    })
+    .reduce((s, i) => s + i.amountGrosze, 0);
 }
 
 export const DEFAULT_PROFILE: Profile = {

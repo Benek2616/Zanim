@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   categoryLabel,
@@ -5,8 +6,11 @@ import {
   formatRemaining,
   formatZl,
   hoursOfWork,
+  SKIP_REASONS,
+  type Profile,
+  type SkipReasonId,
+  type WaitItem,
 } from "@/lib/zanim";
-import type { Profile, WaitItem } from "@/lib/zanim";
 
 export function ItemCard({
   item,
@@ -21,10 +25,11 @@ export function ItemCard({
   now: number;
   profile: Profile;
   onBuy: () => void;
-  onSkip: () => void;
+  onSkip: (reason?: SkipReasonId) => void;
   onExtend: () => void;
   onRemove?: () => void;
 }) {
+  const [pickingReason, setPickingReason] = useState(false);
   const readyAt = new Date(item.readyAt).getTime();
   const ready = now >= readyAt;
   const remaining = readyAt - now;
@@ -67,19 +72,55 @@ export function ItemCard({
           </span>
         </div>
         {item.note ? <p className="mt-3 text-sm leading-relaxed text-muted">{item.note}</p> : null}
-        {ready ? (
+
+        {ready && pickingReason ? (
+          <div className="mt-4">
+            <p className="text-sm font-medium">Dlaczego odpuszczasz?</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {SKIP_REASONS.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  className="rounded-full bg-elevated px-3 py-1.5 text-xs font-semibold text-fg"
+                  onClick={() => {
+                    setPickingReason(false);
+                    onSkip(r.id);
+                  }}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="mt-2 text-xs text-muted"
+              onClick={() => setPickingReason(false)}
+            >
+              Anuluj
+            </button>
+          </div>
+        ) : null}
+
+        {ready && !pickingReason ? (
           <div className="mt-4 grid grid-cols-3 gap-2">
             <Button size="sm" className="rounded-xl" onClick={onBuy}>
               Kupuję
             </Button>
-            <Button size="sm" variant="secondary" className="rounded-xl" onClick={onSkip}>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="rounded-xl"
+              onClick={() => setPickingReason(true)}
+            >
               Odpuszczam
             </Button>
             <Button size="sm" variant="ghost" className="rounded-xl" onClick={onExtend}>
               Przedłuż
             </Button>
           </div>
-        ) : onRemove ? (
+        ) : null}
+
+        {!ready && onRemove ? (
           <button
             type="button"
             onClick={onRemove}
