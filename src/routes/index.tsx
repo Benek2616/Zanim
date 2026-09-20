@@ -10,7 +10,7 @@ import {
   setAppBadge,
 } from "@/lib/notify";
 import { isPlusActive, useZanim } from "@/lib/store";
-import { formatZl, SUGGESTIONS } from "@/lib/zanim";
+import { formatZl, skipStreakDays, SUGGESTIONS } from "@/lib/zanim";
 
 export const Route = createFileRoute("/")({ component: Home });
 
@@ -19,8 +19,8 @@ type Filter = "all" | "ready" | "waiting";
 const TIPS = [
   {
     tag: "Nowość",
-    title: "Zakładki w poczekalni",
-    body: "Filtruj: Wszystkie, Gotowe, Czekają — szybciej znajdziesz werdykty.",
+    title: "Cel oszczędności",
+    body: "Ustaw cel w Więcej → Profil. Raport pokaże postęp przy każdym odpuszczeniu.",
   },
   {
     tag: "Wskazówka",
@@ -28,22 +28,24 @@ const TIPS = [
     body: "To przerwa na oddech. Większość impulsów mija, zanim skończy się timer.",
   },
   {
-    tag: "Plus",
-    title: "Własny czas oddechu",
-    body: "Od 24 h do 30 dni — w planie Plus ustawiasz tempo pod siebie.",
+    tag: "Passa",
+    title: "Dni z odpuszczeniem",
+    body: "Buduj passę: każdego dnia, w którym coś odpuścisz, licznik rośnie.",
   },
   {
     tag: "Na telefon",
     title: "Zainstaluj na ekranie",
-    body: "Działa jak aplikacja, także offline. Zobacz Więcej → Na telefon.",
+    body: "Działa jak aplikacja, także offline. Zobacz Więcej → Menu → Na telefon.",
   },
 ];
 
 function Home() {
   const items = useZanim((s) => s.items);
+  const profile = useZanim((s) => s.profile);
   const entitlements = useZanim((s) => s.entitlements);
   const decide = useZanim((s) => s.decide);
   const extend = useZanim((s) => s.extend);
+  const remove = useZanim((s) => s.remove);
   const [now, setNow] = useState(() => Date.now());
   const [filter, setFilter] = useState<Filter>("all");
   const [tipIndex, setTipIndex] = useState(0);
@@ -75,6 +77,10 @@ function Home() {
     [waiting, now],
   );
   const plus = isPlusActive(entitlements);
+  const streak = useMemo(() => skipStreakDays(items), [items]);
+  const goal = profile.savingsGoalGrosze;
+  const goalPct =
+    goal && goal > 0 ? Math.min(100, Math.round((skippedSum / goal) * 100)) : null;
 
   const visible = useMemo(() => {
     if (filter === "ready") return ready;
@@ -104,7 +110,6 @@ function Home() {
         </h1>
       </div>
 
-      {/* Rotating tip / news card */}
       <div className="rise-in-2 mt-4 overflow-hidden rounded-2xl border border-line/60 bg-fg px-4 py-4 text-accent-fg shadow-soft">
         <p className="text-2xs font-semibold uppercase tracking-mark text-accent-fg/60">{tip.tag}</p>
         <p className="mt-1 font-serif text-lg font-medium">{tip.title}</p>
@@ -127,8 +132,28 @@ function Home() {
       <div className="rise-in-3 mt-4 grid grid-cols-3 gap-2.5">
         <Stat label="W poczekalni" value={String(waiting.length)} />
         <Stat label="Odpuszczone" value={formatZl(skippedSum)} saved />
-        <Stat label="Plan" value={plus ? "Plus" : "Darmowy"} />
+        <Stat label={streak > 0 ? "Passa" : "Plan"} value={streak > 0 ? `${streak} d.` : plus ? "Plus" : "Darmowy"} />
       </div>
+
+      {goalPct != null && goal ? (
+        <div className="mt-4 rounded-2xl border border-line/60 bg-surface p-4 shadow-card">
+          <div className="flex items-center justify-between gap-2 text-sm">
+            <span className="font-medium">Cel oszczędności</span>
+            <span className="text-muted">
+              {formatZl(skippedSum)} / {formatZl(goal)}
+            </span>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-elevated">
+            <div
+              className="h-full rounded-full bg-saved transition-[width] duration-500"
+              style={{ width: `${goalPct}%` }}
+            />
+          </div>
+          <p className="mt-2 text-xs text-muted">
+            {goalPct >= 100 ? "Cel osiągnięty — pięknie." : `Postęp: ${goalPct}%`}
+          </p>
+        </div>
+      ) : null}
 
       {ready.length > 0 ? (
         <div className="mt-4 rounded-2xl border border-saved/30 bg-saved/10 px-4 py-3.5">
@@ -225,9 +250,11 @@ function Home() {
               <ItemCard
                 item={item}
                 now={now}
+                profile={profile}
                 onBuy={() => decide(item.id, "bought")}
                 onSkip={() => decide(item.id, "skipped")}
                 onExtend={() => extend(item.id)}
+                onRemove={() => remove(item.id)}
               />
             </li>
           ))}

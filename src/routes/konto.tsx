@@ -69,6 +69,9 @@ function KontoPage() {
     profile.monthlyIncomeGrosze != null ? String(profile.monthlyIncomeGrosze / 100) : "",
   );
   const [hours, setHours] = useState(String(profile.monthlyHours));
+  const [goal, setGoal] = useState(
+    profile.savingsGoalGrosze != null ? String(profile.savingsGoalGrosze / 100) : "",
+  );
   const [saved, setSaved] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [tab, setTab] = useState<"profil" | "menu" | "dane">("menu");
@@ -76,10 +79,12 @@ function KontoPage() {
   function save() {
     const monthlyIncomeGrosze = income.trim() ? parseAmountToGrosze(income) : null;
     const monthlyHours = Number(hours) || 160;
+    const savingsGoalGrosze = goal.trim() ? parseAmountToGrosze(goal) : null;
     setProfile({
       displayName: name.trim(),
       monthlyIncomeGrosze,
       monthlyHours,
+      savingsGoalGrosze,
     });
     setSaved(true);
     window.setTimeout(() => setSaved(false), 2000);
@@ -108,7 +113,13 @@ function KontoPage() {
         onboardingDone: data.onboardingDone,
         darkMode: data.darkMode,
         items: data.items,
-        profile: data.profile,
+        profile: {
+          displayName: data.profile.displayName,
+          monthlyIncomeGrosze: data.profile.monthlyIncomeGrosze,
+          monthlyHours: data.profile.monthlyHours,
+          savingsGoalGrosze:
+            (data.profile as { savingsGoalGrosze?: number | null }).savingsGoalGrosze ?? null,
+        },
         entitlements: data.entitlements,
         review: data.review,
       });
@@ -119,6 +130,8 @@ function KontoPage() {
           : "",
       );
       setHours(String(data.profile.monthlyHours));
+      const g = (data.profile as { savingsGoalGrosze?: number | null }).savingsGoalGrosze;
+      setGoal(g != null ? String(g / 100) : "");
       setMsg("Przywrócono dane z kopii.");
     } catch {
       setMsg("Nie udało się wczytać pliku.");
@@ -129,7 +142,12 @@ function KontoPage() {
     if (!window.confirm("Na pewno usunąć wszystkie dane Zanim z tego urządzenia?")) return;
     useZanim.setState({
       items: [],
-      profile: { displayName: "", monthlyIncomeGrosze: null, monthlyHours: 160 },
+      profile: {
+        displayName: "",
+        monthlyIncomeGrosze: null,
+        monthlyHours: 160,
+        savingsGoalGrosze: null,
+      },
       entitlements: {
         plan: "free",
         plus: false,
@@ -142,6 +160,7 @@ function KontoPage() {
     setName("");
     setIncome("");
     setHours("160");
+    setGoal("");
     setMsg("Dane wyczyszczone.");
   }
 
@@ -156,7 +175,6 @@ function KontoPage() {
         </p>
       </div>
 
-      {/* Sub-tabs */}
       <div className="flex gap-1 rounded-xl bg-elevated/70 p-1">
         {(
           [
@@ -180,7 +198,6 @@ function KontoPage() {
 
       {tab === "menu" ? (
         <div className="space-y-3">
-          {/* Dark mode */}
           <div className="flex items-center justify-between gap-4 rounded-2xl border border-line/70 bg-surface px-4 py-4 shadow-card">
             <div className="flex items-center gap-3">
               <div className="grid size-10 place-items-center rounded-xl bg-elevated text-fg">
@@ -255,6 +272,16 @@ function KontoPage() {
               inputMode="numeric"
               value={hours}
               onChange={(e) => setHours(e.target.value)}
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm text-muted">Cel oszczędności (zł) — opcjonalnie</span>
+            <input
+              className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-3 outline-none focus:ring-2 focus:ring-fg/20"
+              inputMode="decimal"
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
+              placeholder="np. 2000"
             />
           </label>
           <Button onClick={save}>{saved ? "Zapisano" : "Zapisz profil"}</Button>

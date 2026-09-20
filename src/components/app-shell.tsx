@@ -3,6 +3,7 @@ import { Hourglass, Pause, PiggyBank, UserRound, Plus } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
 import { ZMark } from "@/components/mark";
 import { Onboarding } from "@/components/onboarding";
+import { ToastHost } from "@/components/toast";
 import { cn } from "@/lib/utils";
 import { setupPwa } from "@/lib/pwa";
 import { useZanim } from "@/lib/store";
@@ -84,6 +85,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <main className={cn("flex-1 px-5 pt-5", hideTabs ? "pb-10" : "pb-28")}>{children}</main>
+      <ToastHost />
 
       {!hideTabs ? (
         <nav className="fixed inset-x-0 bottom-0 z-20">
