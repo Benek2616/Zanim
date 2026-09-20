@@ -10,11 +10,34 @@ import {
   setAppBadge,
 } from "@/lib/notify";
 import { isPlusActive, useZanim } from "@/lib/store";
-import { formatZl } from "@/lib/zanim";
+import { formatZl, SUGGESTIONS } from "@/lib/zanim";
 
 export const Route = createFileRoute("/")({ component: Home });
 
 type Filter = "all" | "ready" | "waiting";
+
+const TIPS = [
+  {
+    tag: "Nowość",
+    title: "Zakładki w poczekalni",
+    body: "Filtruj: Wszystkie, Gotowe, Czekają — szybciej znajdziesz werdykty.",
+  },
+  {
+    tag: "Wskazówka",
+    title: "48 godzin to nie kara",
+    body: "To przerwa na oddech. Większość impulsów mija, zanim skończy się timer.",
+  },
+  {
+    tag: "Plus",
+    title: "Własny czas oddechu",
+    body: "Od 24 h do 30 dni — w planie Plus ustawiasz tempo pod siebie.",
+  },
+  {
+    tag: "Na telefon",
+    title: "Zainstaluj na ekranie",
+    body: "Działa jak aplikacja, także offline. Zobacz Więcej → Na telefon.",
+  },
+];
 
 function Home() {
   const items = useZanim((s) => s.items);
@@ -23,12 +46,18 @@ function Home() {
   const extend = useZanim((s) => s.extend);
   const [now, setNow] = useState(() => Date.now());
   const [filter, setFilter] = useState<Filter>("all");
+  const [tipIndex, setTipIndex] = useState(0);
   const [perm, setPerm] = useState(() =>
     typeof window === "undefined" ? "default" : notificationPermission(),
   );
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setTipIndex((i) => (i + 1) % TIPS.length), 6000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -64,6 +93,8 @@ function Home() {
     );
   }, [ready]);
 
+  const tip = TIPS[tipIndex];
+
   return (
     <div className="pb-4">
       <div className="rise-in">
@@ -73,20 +104,40 @@ function Home() {
         </h1>
       </div>
 
-      <div className="rise-in-2 mt-5 grid grid-cols-3 gap-2.5">
+      {/* Rotating tip / news card */}
+      <div className="rise-in-2 mt-4 overflow-hidden rounded-2xl border border-line/60 bg-fg px-4 py-4 text-accent-fg shadow-soft">
+        <p className="text-2xs font-semibold uppercase tracking-mark text-accent-fg/60">{tip.tag}</p>
+        <p className="mt-1 font-serif text-lg font-medium">{tip.title}</p>
+        <p className="mt-1 text-sm leading-relaxed text-accent-fg/75">{tip.body}</p>
+        <div className="mt-3 flex gap-1.5">
+          {TIPS.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-label={`Wskazówka ${i + 1}`}
+              onClick={() => setTipIndex(i)}
+              className={`h-1 flex-1 rounded-full transition-colors ${
+                i === tipIndex ? "bg-accent-fg" : "bg-accent-fg/25"
+              }`}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="rise-in-3 mt-4 grid grid-cols-3 gap-2.5">
         <Stat label="W poczekalni" value={String(waiting.length)} />
         <Stat label="Odpuszczone" value={formatZl(skippedSum)} saved />
         <Stat label="Plan" value={plus ? "Plus" : "Darmowy"} />
       </div>
 
       {ready.length > 0 ? (
-        <div className="rise-in-3 mt-4 rounded-2xl bg-fg px-4 py-3.5 text-accent-fg shadow-soft">
-          <p className="text-sm font-medium">
+        <div className="mt-4 rounded-2xl border border-saved/30 bg-saved/10 px-4 py-3.5">
+          <p className="text-sm font-semibold text-saved">
             {ready.length === 1
               ? "1 rzecz czeka na werdykt"
               : `${ready.length} rzeczy czekają na werdykt`}
           </p>
-          <p className="mt-0.5 text-xs text-accent-fg/70">Czas minął — kupujesz albo odpuszczasz.</p>
+          <p className="mt-0.5 text-xs text-muted">Czas minął — kupujesz albo odpuszczasz.</p>
         </div>
       ) : null}
 
@@ -127,19 +178,40 @@ function Home() {
       ) : null}
 
       {waiting.length === 0 ? (
-        <div className="mt-12 flex flex-col items-center text-center">
-          <div className="float-soft text-fg">
-            <PauseBars />
+        <div className="mt-8">
+          <div className="flex flex-col items-center text-center">
+            <div className="float-soft text-fg">
+              <PauseBars />
+            </div>
+            <p className="mt-6 font-serif text-2xl font-medium">Pusto i spokojnie</p>
+            <p className="mt-2 max-w-[17rem] text-sm leading-relaxed text-muted">
+              Dodaj rzecz z listy poniżej albo wpisz własną. Odczekaj 48 godzin.
+            </p>
           </div>
-          <p className="mt-7 font-serif text-2xl font-medium">Pusto i spokojnie</p>
-          <p className="mt-2 max-w-[16rem] text-sm leading-relaxed text-muted">
-            Dodaj rzecz, którą chcesz kupić. Odczekaj 48 godzin. Potem zdecyduj.
+
+          <p className="mt-8 text-2xs font-semibold uppercase tracking-mark text-subtle">
+            Szybki start — przykłady
           </p>
+          <ul className="mt-3 grid grid-cols-2 gap-2">
+            {SUGGESTIONS.slice(0, 6).map((s) => (
+              <li key={s.title}>
+                <Link
+                  to="/nowe"
+                  search={{ title: s.title, amount: String(s.amountZl), category: s.category }}
+                  className="block rounded-2xl border border-line/70 bg-surface px-3 py-3 text-left shadow-card transition active:scale-[0.98]"
+                >
+                  <p className="truncate text-sm font-medium">{s.title}</p>
+                  <p className="mt-0.5 text-xs text-muted">{s.amountZl} zł</p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+
           <Link
             to="/nowe"
-            className="mt-7 inline-flex h-12 items-center rounded-xl bg-fg px-6 text-sm font-semibold text-accent-fg shadow-soft"
+            className="mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-fg text-sm font-semibold text-accent-fg shadow-soft"
           >
-            Dodaj pierwszą rzecz
+            Dodaj własną rzecz
           </Link>
         </div>
       ) : (

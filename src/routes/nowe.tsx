@@ -11,17 +11,35 @@ import {
 } from "@/lib/zanim";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/nowe")({ component: NowePage });
+type NoweSearch = {
+  title?: string;
+  amount?: string;
+  category?: string;
+};
+
+export const Route = createFileRoute("/nowe")({
+  validateSearch: (s: Record<string, unknown>): NoweSearch => ({
+    title: typeof s.title === "string" ? s.title : undefined,
+    amount: typeof s.amount === "string" ? s.amount : undefined,
+    category: typeof s.category === "string" ? s.category : undefined,
+  }),
+  component: NowePage,
+});
 
 function NowePage() {
   const navigate = useNavigate();
+  const search = Route.useSearch();
   const addItem = useZanim((s) => s.addItem);
   const entitlements = useZanim((s) => s.entitlements);
   const plus = isPlusActive(entitlements);
 
-  const [title, setTitle] = useState("");
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState<CategoryId>("inne");
+  const initialCat = CATEGORIES.some((c) => c.id === search.category)
+    ? (search.category as CategoryId)
+    : "inne";
+
+  const [title, setTitle] = useState(search.title ?? "");
+  const [amount, setAmount] = useState(search.amount ?? "");
+  const [category, setCategory] = useState<CategoryId>(initialCat);
   const [note, setNote] = useState("");
   const [waitHours, setWaitHours] = useState(FREE_WAIT_HOURS);
   const [error, setError] = useState<string | null>(null);
@@ -54,14 +72,14 @@ function NowePage() {
   return (
     <form onSubmit={onSubmit} className="rise-in space-y-5 pb-8">
       <div>
-        <p className="text-2xs font-medium uppercase tracking-mark text-subtle">Nowe</p>
+        <p className="text-2xs font-semibold uppercase tracking-mark text-subtle">Nowe</p>
         <h1 className="mt-1 font-serif text-3xl font-medium">Do poczekalni</h1>
       </div>
 
       <label className="block">
         <span className="text-sm text-muted">Co chcesz kupić?</span>
         <input
-          className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-3 text-base outline-none focus:ring-2 focus:ring-fg/20"
+          className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-3 text-base outline-none focus:ring-2 focus:ring-fg/20"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="np. AirPods"
@@ -71,7 +89,7 @@ function NowePage() {
       <label className="block">
         <span className="text-sm text-muted">Kwota (zł)</span>
         <input
-          className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-3 text-base outline-none focus:ring-2 focus:ring-fg/20"
+          className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-3 text-base outline-none focus:ring-2 focus:ring-fg/20"
           inputMode="decimal"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
@@ -88,7 +106,7 @@ function NowePage() {
               type="button"
               onClick={() => setCategory(c.id)}
               className={cn(
-                "rounded-full px-3 py-1.5 text-sm",
+                "rounded-full px-3 py-1.5 text-sm font-medium transition",
                 category === c.id ? "bg-fg text-accent-fg" : "bg-elevated text-fg",
               )}
             >
@@ -108,7 +126,7 @@ function NowePage() {
                 type="button"
                 onClick={() => setWaitHours(o.hours)}
                 className={cn(
-                  "rounded-full px-3 py-1.5 text-sm",
+                  "rounded-full px-3 py-1.5 text-sm font-medium",
                   waitHours === o.hours ? "bg-fg text-accent-fg" : "bg-elevated text-fg",
                 )}
               >
@@ -118,13 +136,15 @@ function NowePage() {
           </div>
         </div>
       ) : (
-        <p className="text-sm text-muted">Czas oddechu: 48 godzin (w Plusie możesz zmienić).</p>
+        <p className="rounded-xl bg-elevated/60 px-3 py-2.5 text-sm text-muted">
+          Czas oddechu: <strong className="text-fg">48 godzin</strong> (w Plusie możesz zmienić).
+        </p>
       )}
 
       <label className="block">
         <span className="text-sm text-muted">Notatka (opcjonalnie)</span>
         <textarea
-          className="mt-1 w-full rounded-md border border-line bg-surface px-3 py-3 text-base outline-none focus:ring-2 focus:ring-fg/20"
+          className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-3 text-base outline-none focus:ring-2 focus:ring-fg/20"
           rows={3}
           value={note}
           onChange={(e) => setNote(e.target.value)}
