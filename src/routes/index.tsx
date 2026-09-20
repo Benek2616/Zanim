@@ -16,11 +16,10 @@ function HomePage() {
         gap: "1rem",
         padding: "1.5rem",
         textAlign: "center",
-        background: "#f3efe6",
       }}
     >
-      <h1 style={{ fontSize: "2rem", margin: 0 }}>Zanim</h1>
-      <p style={{ maxWidth: "28rem", color: "#4a4a4a", margin: 0 }}>
+      <h1 style={{ fontSize: "2.5rem", margin: 0, fontWeight: 600 }}>Zanim</h1>
+      <p style={{ maxWidth: "28rem", color: "#4a4a4a", margin: 0, lineHeight: 1.5 }}>
         Poczekalnia zakupów. Odczekaj 48 godzin, zanim wydasz pieniądze.
       </p>
     </main>

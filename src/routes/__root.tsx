@@ -1,5 +1,4 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
-import appCss from "../styles.css?url";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -9,10 +8,10 @@ export const Route = createRootRoute({
       { title: "Zanim" },
       {
         name: "description",
-        content: "Zanim — poczekalnia zakupów. Odczekaj 48 godzin, zanim wydasz pieniądze.",
+        content:
+          "Zanim — poczekalnia zakupów. Odczekaj 48 godzin, zanim wydasz pieniądze.",
       },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
   }),
   component: RootComponent,
 });
@@ -23,7 +22,15 @@ function RootComponent() {
       <head>
         <HeadContent />
       </head>
-      <body>
+      <body
+        style={{
+          margin: 0,
+          minHeight: "100dvh",
+          background: "#f3efe6",
+          color: "#1a1916",
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
         <Outlet />
         <Scripts />
       </body>
