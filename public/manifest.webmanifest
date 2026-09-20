@@ -1,0 +1,33 @@
+{
+  "name": "Zanim — poczekalnia zakupów",
+  "short_name": "Zanim",
+  "description": "Odczekaj 48 godzin, zanim wydasz pieniądze.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f4efe6",
+  "theme_color": "#f4efe6",
+  "lang": "pl",
+  "categories": ["lifestyle", "finance", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

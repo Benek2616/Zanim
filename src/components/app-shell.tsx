@@ -4,6 +4,7 @@ import { type ReactNode, useEffect } from "react";
 import { ZMark } from "@/components/mark";
 import { Onboarding } from "@/components/onboarding";
 import { cn } from "@/lib/utils";
+import { setupPwa } from "@/lib/pwa";
 import { useZanim } from "@/lib/store";
 
 const TABS = [
@@ -23,6 +24,8 @@ function isTabActive(to: string, pathname: string): boolean {
 function applyDarkClass(dark: boolean) {
   if (typeof document === "undefined") return;
   document.documentElement.classList.toggle("dark", dark);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", dark ? "#121110" : "#f4efe6");
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -33,6 +36,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
+    setupPwa();
     void Promise.resolve(useZanim.persist.rehydrate()).then(() => markHydrated());
   }, [markHydrated]);
 
