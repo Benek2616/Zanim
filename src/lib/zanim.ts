@@ -51,8 +51,8 @@ export const PLANS: Record<
     priceGrosze: 0,
     periodDays: 0,
     priceLabel: "0 zł",
-    periodLabel: "zawsze",
-    blurb: "Żeby sprawdzić, czy odczekiwanie w ogóle działa.",
+    periodLabel: "bez konta",
+    blurb: "Szybki start bez rejestracji.",
     features: [
       "5 rzeczy naraz w poczekalni",
       "Stałe 48 godzin oddechu",
@@ -63,31 +63,27 @@ export const PLANS: Record<
   plus_month: {
     id: "plus_month",
     name: "Plus",
-    priceGrosze: 900,
-    periodDays: 30,
-    priceLabel: "9 zł",
-    periodLabel: "miesiąc",
-    blurb: "Bez limitu i z własnym tempem. Tyle co kawa na mieście.",
+    priceGrosze: 0,
+    periodDays: 0,
+    priceLabel: "0 zł",
+    periodLabel: "za konto",
+    blurb: "Załóż konto — odblokujesz Plus bez płatności.",
     features: [
       "Bez limitu rzeczy w poczekalni",
       "Czas oddechu od 24 h do 30 dni",
-      "Raport: ile nie wydałaś / nie wydałeś",
-      "Przelicznik na godziny twojej pracy",
+      "Raport i cel oszczędności",
+      "Przelicznik na godziny pracy",
     ],
   },
   plus_year: {
     id: "plus_year",
-    name: "Plus rocznie",
-    priceGrosze: 7900,
-    periodDays: 365,
-    priceLabel: "79 zł",
-    periodLabel: "rok",
-    blurb: "Dwa miesiące w prezencie. Wychodzi 6,58 zł miesięcznie.",
-    features: [
-      "Wszystko z planu Plus",
-      "Płatność raz, spokój na rok",
-      "29 zł taniej niż 12 × 9 zł",
-    ],
+    name: "Plus",
+    priceGrosze: 0,
+    periodDays: 0,
+    priceLabel: "0 zł",
+    periodLabel: "za konto",
+    blurb: "Ten sam Plus — aktywowany kontem, nie subskrypcją.",
+    features: ["Wszystko z planu Plus", "Bez karty i bez firmy na start"],
   },
 };
 
@@ -112,6 +108,8 @@ export type WaitItem = {
 
 export type Profile = {
   displayName: string;
+  email: string;
+  accountCreated: boolean;
   monthlyIncomeGrosze: number | null;
   monthlyHours: number;
   savingsGoalGrosze: number | null;
@@ -243,9 +241,8 @@ export function skipStreakDays(items: WaitItem[]): number {
   return streak;
 }
 
-/** Sugerowany czas oddechu wg kwoty (grosze). */
 export function suggestedWaitHours(amountGrosze: number): number {
-  if (amountGrosze >= 100_000) return 168; // 7 dni
+  if (amountGrosze >= 100_000) return 168;
   if (amountGrosze >= 50_000) return 72;
   if (amountGrosze >= 20_000) return 48;
   return 48;
@@ -253,7 +250,7 @@ export function suggestedWaitHours(amountGrosze: number): number {
 
 function startOfWeek(d = new Date()): Date {
   const x = new Date(d);
-  const day = (x.getDay() + 6) % 7; // poniedziałek = 0
+  const day = (x.getDay() + 6) % 7;
   x.setHours(0, 0, 0, 0);
   x.setDate(x.getDate() - day);
   return x;
@@ -275,6 +272,8 @@ export function weekSkippedSum(items: WaitItem[], weeksAgo = 0): number {
 
 export const DEFAULT_PROFILE: Profile = {
   displayName: "",
+  email: "",
+  accountCreated: false,
   monthlyIncomeGrosze: null,
   monthlyHours: 160,
   savingsGoalGrosze: null,

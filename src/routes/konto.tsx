@@ -11,13 +11,11 @@ import {
   Shield,
   ChevronRight,
   Sparkles,
-  LogIn,
-  LogOut,
+  UserPlus,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { downloadBackup, parseBackup } from "@/lib/data-io";
-import { billingConfigured, getSupabase } from "@/lib/supabase";
 import { isPlusActive, useZanim } from "@/lib/store";
 import { parseAmountToGrosze } from "@/lib/zanim";
 
@@ -25,10 +23,10 @@ export const Route = createFileRoute("/konto")({ component: KontoPage });
 
 const MENU = [
   { to: "/na-telefon" as const, label: "Na telefon", desc: "Zainstaluj jak aplikację", icon: Smartphone },
-  { to: "/cennik" as const, label: "Plan Plus", desc: "Bez limitu i własny czas", icon: Sparkles },
+  { to: "/cennik" as const, label: "Plan Plus", desc: "Za konto — bez opłat", icon: Sparkles },
   { to: "/opinie" as const, label: "Opinie", desc: "Oceń Zanim", icon: MessageSquareHeart },
   { to: "/regulamin" as const, label: "Regulamin", desc: "Zasady korzystania", icon: ScrollText },
-  { to: "/prywatnosc" as const, label: "Prywatność", desc: "Dane tylko u Ciebie", icon: Shield },
+  { to: "/prywatnosc" as const, label: "Prywatność", desc: "Dane u Ciebie", icon: Shield },
 ];
 
 function KontoPage() {
@@ -37,12 +35,15 @@ function KontoPage() {
   const darkMode = useZanim((s) => s.darkMode);
   const setDarkMode = useZanim((s) => s.setDarkMode);
   const setProfile = useZanim((s) => s.setProfile);
+  const createAccount = useZanim((s) => s.createAccount);
+  const deleteAccount = useZanim((s) => s.deleteAccount);
   const items = useZanim((s) => s.items);
   const onboardingDone = useZanim((s) => s.onboardingDone);
   const review = useZanim((s) => s.review);
   const fileRef = useRef<HTMLInputElement>(null);
   const plus = isPlusActive(entitlements);
   const [name, setName] = useState(profile.displayName);
+  const [email, setEmail] = useState(profile.email);
   const [income, setIncome] = useState(
     profile.monthlyIncomeGrosze != null ? String(profile.monthlyIncomeGrosze / 100) : "",
   );
@@ -53,22 +54,9 @@ function KontoPage() {
   const [saved, setSaved] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [tab, setTab] = useState<"profil" | "menu" | "dane">("menu");
-  const [authEmail, setAuthEmail] = useState("");
-  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
-  const [authMsg, setAuthMsg] = useState<string | null>(null);
-  const [authBusy, setAuthBusy] = useState(false);
-
-  useEffect(() => {
-    const sb = getSupabase();
-    if (!sb) return;
-    void sb.auth.getSession().then(({ data }) => {
-      setSessionEmail(data.session?.user.email ?? null);
-    });
-    const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
-      setSessionEmail(session?.user.email ?? null);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, []);
+  const [regName, setRegName] = useState(profile.displayName);
+  const [regEmail, setRegEmail] = useState(profile.email);
+  const [regError, setRegError] = useState<string | null>(null);
 
   function save() {
     const monthlyIncomeGrosze = income.trim() ? parseAmountToGrosze(income) : null;
@@ -76,6 +64,7 @@ function KontoPage() {
     const savingsGoalGrosze = goal.trim() ? parseAmountToGrosze(goal) : null;
     setProfile({
       displayName: name.trim(),
+      email: email.trim().toLowerCase(),
       monthlyIncomeGrosze,
       monthlyHours,
       savingsGoalGrosze,
@@ -84,32 +73,19 @@ function KontoPage() {
     window.setTimeout(() => setSaved(false), 2000);
   }
 
-  async function sendMagicLink() {
-    const sb = getSupabase();
-    if (!sb) {
-      setAuthMsg("Supabase nie jest skonfigurowany (VITE_SUPABASE_*)." );
+  function register() {
+    setRegError(null);
+    if (!regName.trim()) {
+      setRegError("Podaj imię lub nick.");
       return;
     }
-    if (!authEmail.includes("@")) {
-      setAuthMsg("Podaj poprawny e-mail.");
+    if (!regEmail.includes("@")) {
+      setRegError("Podaj poprawny e-mail.");
       return;
     }
-    setAuthBusy(true);
-    setAuthMsg(null);
-    const redirectTo = `${window.location.origin}/konto`;
-    const { error } = await sb.auth.signInWithOtp({
-      email: authEmail.trim(),
-      options: { emailRedirectTo: redirectTo },
-    });
-    setAuthBusy(false);
-    if (error) setAuthMsg(error.message);
-    else setAuthMsg("Sprawdź skrzynkę — wysłaliśmy link do logowania.");
-  }
-
-  async function signOut() {
-    const sb = getSupabase();
-    await sb?.auth.signOut();
-    setSessionEmail(null);
+    createAccount({ displayName: regName, email: regEmail });
+    setName(regName.trim());
+    setEmail(regEmail.trim().toLowerCase());
   }
 
   function exportData() {
@@ -131,18 +107,29 @@ function KontoPage() {
     try {
       const text = await file.text();
       const data = parseBackup(text);
+      const p = data.profile as {
+        displayName?: string;
+        email?: string;
+        accountCreated?: boolean;
+        monthlyIncomeGrosze?: number | null;
+        monthlyHours?: number;
+        savingsGoalGrosze?: number | null;
+      };
       useZanim.setState({
         onboardingDone: data.onboardingDone,
         darkMode: data.darkMode,
         items: data.items,
         profile: {
-          displayName: data.profile.displayName,
-          monthlyIncomeGrosze: data.profile.monthlyIncomeGrosze,
-          monthlyHours: data.profile.monthlyHours,
-          savingsGoalGrosze:
-            (data.profile as { savingsGoalGrosze?: number | null }).savingsGoalGrosze ?? null,
+          displayName: p.displayName ?? "",
+          email: p.email ?? "",
+          accountCreated: Boolean(p.accountCreated),
+          monthlyIncomeGrosze: p.monthlyIncomeGrosze ?? null,
+          monthlyHours: p.monthlyHours ?? 160,
+          savingsGoalGrosze: p.savingsGoalGrosze ?? null,
         },
-        entitlements: data.entitlements,
+        entitlements: p.accountCreated
+          ? { plan: "plus_month", plus: true, periodEnd: null, cancelAtPeriodEnd: false }
+          : data.entitlements,
         review: data.review,
       });
       setMsg("Przywrócono dane z kopii.");
@@ -157,6 +144,8 @@ function KontoPage() {
       items: [],
       profile: {
         displayName: "",
+        email: "",
+        accountCreated: false,
         monthlyIncomeGrosze: null,
         monthlyHours: 160,
         savingsGoalGrosze: null,
@@ -184,37 +173,53 @@ function KontoPage() {
         </p>
       </div>
 
-      {/* Logowanie */}
+      {/* Konto = Plus */}
       <div className="rounded-2xl border border-line/70 bg-surface p-4 shadow-card">
         <div className="flex items-center gap-2 font-medium">
-          {sessionEmail ? <LogOut className="size-4" /> : <LogIn className="size-4" />}
-          {sessionEmail ? "Sesja" : "Logowanie"}
+          <UserPlus className="size-4" />
+          {profile.accountCreated ? "Twoje konto" : "Załóż konto → Plus"}
         </div>
-        {sessionEmail ? (
+        {profile.accountCreated ? (
           <div className="mt-2 space-y-2">
-            <p className="text-sm text-muted">{sessionEmail}</p>
-            <Button size="sm" variant="secondary" onClick={() => void signOut()}>
-              Wyloguj
+            <p className="text-sm text-muted">
+              {profile.displayName}
+              {profile.email ? ` · ${profile.email}` : ""}
+            </p>
+            <p className="text-sm text-saved">Plus aktywny (lokalnie na tym urządzeniu)</p>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-warn"
+              onClick={() => {
+                if (window.confirm("Usunąć konto i wrócić do planu darmowego?")) deleteAccount();
+              }}
+            >
+              Usuń konto
             </Button>
           </div>
-        ) : billingConfigured ? (
+        ) : (
           <div className="mt-3 space-y-2">
+            <p className="text-sm text-muted">
+              Imię i e-mail zostają tylko na tym telefonie. Od razu odblokujesz Plus — bez płatności.
+            </p>
+            <input
+              className="w-full rounded-xl border border-line bg-bg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-fg/20"
+              placeholder="Imię lub nick"
+              value={regName}
+              onChange={(e) => setRegName(e.target.value)}
+            />
             <input
               className="w-full rounded-xl border border-line bg-bg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-fg/20"
               type="email"
               placeholder="email@example.com"
-              value={authEmail}
-              onChange={(e) => setAuthEmail(e.target.value)}
+              value={regEmail}
+              onChange={(e) => setRegEmail(e.target.value)}
             />
-            <Button size="sm" disabled={authBusy} onClick={() => void sendMagicLink()}>
-              {authBusy ? "Wysyłanie…" : "Wyślij link do logowania"}
+            {regError ? <p className="text-xs text-warn">{regError}</p> : null}
+            <Button size="sm" onClick={register}>
+              Załóż konto i aktywuj Plus
             </Button>
-            {authMsg ? <p className="text-xs text-muted">{authMsg}</p> : null}
           </div>
-        ) : (
-          <p className="mt-2 text-sm text-muted">
-            Logowanie włączy się po konfiguracji Supabase (patrz docs/SPRZEDAZ.md).
-          </p>
         )}
       </div>
 
@@ -291,11 +296,20 @@ function KontoPage() {
       {tab === "profil" ? (
         <div className="space-y-4">
           <label className="block">
-            <span className="text-sm text-muted">Jak masz na imię?</span>
+            <span className="text-sm text-muted">Imię / nick</span>
             <input
               className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-3 outline-none focus:ring-2 focus:ring-fg/20"
               value={name}
               onChange={(e) => setName(e.target.value)}
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm text-muted">E-mail</span>
+            <input
+              className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-3 outline-none focus:ring-2 focus:ring-fg/20"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
             />
           </label>
           <label className="block">
@@ -323,7 +337,6 @@ function KontoPage() {
               inputMode="decimal"
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
-              placeholder="np. 2000"
             />
           </label>
           <Button onClick={save}>{saved ? "Zapisano" : "Zapisz profil"}</Button>

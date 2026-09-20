@@ -8,7 +8,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.0",
     "@tailwindcss/vite": "^4.3.0",
     "@tanstack/react-router": "^1.170.0",
     "@tanstack/react-start": "^1.168.0",
@@ -17,7 +16,6 @@
     "lucide-react": "^0.510.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "stripe": "^17.0.0",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.3.0",
     "zustand": "^5.0.0"

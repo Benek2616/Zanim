@@ -5,11 +5,9 @@ import {
   DEFAULT_PROFILE,
   FREE_WAIT_HOURS,
   FREE_WAIT_LIMIT,
-  PLANS,
   type CategoryId,
   type Entitlements,
   type ItemStatus,
-  type PlanId,
   type Profile,
   type Review,
   type SkipReasonId,
@@ -19,6 +17,8 @@ import {
 function normalizeProfile(p: Partial<Profile> | Profile | undefined): Profile {
   return {
     displayName: p?.displayName ?? "",
+    email: p?.email ?? "",
+    accountCreated: Boolean(p?.accountCreated),
     monthlyIncomeGrosze: p?.monthlyIncomeGrosze ?? null,
     monthlyHours: p?.monthlyHours ?? 160,
     savingsGoalGrosze: p?.savingsGoalGrosze ?? null,
@@ -47,6 +47,9 @@ export type ZanimState = {
   setDarkMode: (value: boolean) => void;
   clearToast: () => void;
   clearLastSkip: () => void;
+  /** Zakłada lokalne konto i aktywuje Plus (bez płatności). */
+  createAccount: (input: { displayName: string; email: string }) => void;
+  deleteAccount: () => void;
   addItem: (input: {
     title: string;
     amountGrosze: number;
@@ -63,9 +66,6 @@ export type ZanimState = {
   extend: (id: string) => void;
   remove: (id: string) => void;
   setProfile: (patch: Partial<Profile>) => void;
-  activatePlus: (plan: Exclude<PlanId, "free">) => void;
-  cancelPlus: () => void;
-  resumePlus: () => void;
   setReview: (stars: number, body: string) => void;
 };
 
@@ -74,10 +74,13 @@ function newId(): string {
   return `z_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function plusActive(ent: Entitlements, now = Date.now()): boolean {
-  if (!ent.plus) return false;
-  if (!ent.periodEnd) return true;
-  return new Date(ent.periodEnd).getTime() > now;
+function plusEntitlements(): Entitlements {
+  return {
+    plan: "plus_month",
+    plus: true,
+    periodEnd: null,
+    cancelAtPeriodEnd: false,
+  };
 }
 
 export const useZanim = create<ZanimState>()(
@@ -98,19 +101,42 @@ export const useZanim = create<ZanimState>()(
       setDarkMode: (value) => set({ darkMode: value }),
       clearToast: () => set({ lastToast: null }),
       clearLastSkip: () => set({ lastSkipId: null }),
+      createAccount: ({ displayName, email }) => {
+        set({
+          profile: normalizeProfile({
+            ...get().profile,
+            displayName: displayName.trim(),
+            email: email.trim().toLowerCase(),
+            accountCreated: true,
+          }),
+          entitlements: plusEntitlements(),
+          lastToast: "Konto utworzone — Plus aktywny",
+        });
+      },
+      deleteAccount: () => {
+        set({
+          profile: normalizeProfile({
+            ...get().profile,
+            email: "",
+            accountCreated: false,
+          }),
+          entitlements: DEFAULT_ENTITLEMENTS,
+          lastToast: "Konto usunięte — plan darmowy",
+        });
+      },
       addItem: (input) => {
         const { items, entitlements } = get();
-        const plus = plusActive(entitlements);
+        const plus = entitlements.plus;
         const waiting = items.filter((i) => i.status === "waiting");
         if (!plus && waiting.length >= FREE_WAIT_LIMIT) {
           return {
             ok: false,
-            error: "Darmowy plan ma 5 rzeczy naraz. Odpuszczone zwolnią miejsce — albo weź Plus.",
+            error: "Darmowy plan ma 5 rzeczy naraz. Załóż konto (Plus) albo odpuść coś z listy.",
             code: "limit",
           };
         }
         if (!plus && input.waitHours !== FREE_WAIT_HOURS) {
-          return { ok: false, error: "Własny czas oddechu jest w Plusie.", code: "plus" };
+          return { ok: false, error: "Własny czas oddechu jest w Plusie (po założeniu konta).", code: "plus" };
         }
         const now = Date.now();
         const waitHours = plus ? input.waitHours : FREE_WAIT_HOURS;
@@ -146,9 +172,7 @@ export const useZanim = create<ZanimState>()(
           pendingUndo: { itemId: id, snapshot, expiresAt: Date.now() + 10_000 },
           lastSkipId: status === "skipped" ? id : get().lastSkipId,
           lastToast:
-            status === "skipped"
-              ? `Odpuszczasz ${item.title}`
-              : `Kupujesz ${item.title}`,
+            status === "skipped" ? `Odpuszczasz ${item.title}` : `Kupujesz ${item.title}`,
         });
       },
       undoLast: () => {
@@ -176,21 +200,6 @@ export const useZanim = create<ZanimState>()(
       },
       remove: (id) => set({ items: get().items.filter((item) => item.id !== id) }),
       setProfile: (patch) => set({ profile: normalizeProfile({ ...get().profile, ...patch }) }),
-      activatePlus: (plan) => {
-        const days = PLANS[plan].periodDays;
-        const periodEnd = new Date(Date.now() + days * 86_400_000).toISOString();
-        set({ entitlements: { plan, plus: true, periodEnd, cancelAtPeriodEnd: false } });
-      },
-      cancelPlus: () => {
-        const current = get().entitlements;
-        if (!current.plus) return;
-        set({ entitlements: { ...current, cancelAtPeriodEnd: true } });
-      },
-      resumePlus: () => {
-        const current = get().entitlements;
-        if (!current.plus) return;
-        set({ entitlements: { ...current, cancelAtPeriodEnd: false } });
-      },
       setReview: (stars, body) => {
         const name = get().profile.displayName.trim() || "Ty";
         set({
@@ -208,10 +217,20 @@ export const useZanim = create<ZanimState>()(
       skipHydration: true,
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<ZanimState>;
+        const profile = normalizeProfile(p.profile ?? current.profile);
+        // konto = Plus
+        const entitlements = profile.accountCreated
+          ? plusEntitlements()
+          : (p.entitlements ?? current.entitlements)?.plus && !profile.accountCreated
+            ? DEFAULT_ENTITLEMENTS
+            : profile.accountCreated
+              ? plusEntitlements()
+              : (p.entitlements ?? DEFAULT_ENTITLEMENTS);
         return {
           ...current,
           ...p,
-          profile: normalizeProfile(p.profile ?? current.profile),
+          profile,
+          entitlements: profile.accountCreated ? plusEntitlements() : DEFAULT_ENTITLEMENTS,
           hydrated: false,
           lastToast: null,
           pendingUndo: null,
@@ -231,8 +250,5 @@ export const useZanim = create<ZanimState>()(
 );
 
 export function isPlusActive(ent: Entitlements): boolean {
-  if (ent.cancelAtPeriodEnd && ent.periodEnd && new Date(ent.periodEnd).getTime() <= Date.now()) {
-    return false;
-  }
-  return plusActive(ent);
+  return Boolean(ent.plus);
 }
