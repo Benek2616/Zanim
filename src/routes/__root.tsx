@@ -1,17 +1,20 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { AppShell } from "@/components/app-shell";
+import appCss from "../styles.css?url";
 
 export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "Zanim" },
       {
         name: "description",
-        content:
-          "Zanim — poczekalnia zakupów. Odczekaj 48 godzin, zanim wydasz pieniądze.",
+        content: "Zanim — poczekalnia zakupów. Odczekaj 48 godzin, zanim wydasz pieniądze.",
       },
+      { name: "theme-color", content: "#f3efe6" },
     ],
+    links: [{ rel: "stylesheet", href: appCss }],
   }),
   component: RootComponent,
 });
@@ -22,16 +25,10 @@ function RootComponent() {
       <head>
         <HeadContent />
       </head>
-      <body
-        style={{
-          margin: 0,
-          minHeight: "100dvh",
-          background: "#f3efe6",
-          color: "#1a1916",
-          fontFamily: "system-ui, sans-serif",
-        }}
-      >
-        <Outlet />
+      <body>
+        <AppShell>
+          <Outlet />
+        </AppShell>
         <Scripts />
       </body>
     </html>
