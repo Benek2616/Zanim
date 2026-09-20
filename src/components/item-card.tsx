@@ -1,25 +1,40 @@
 import { Button } from "@/components/ui/button";
-import { categoryLabel, formatRemaining, formatZl } from "@/lib/zanim";
-import type { WaitItem } from "@/lib/zanim";
+import {
+  categoryLabel,
+  formatHours,
+  formatRemaining,
+  formatZl,
+  hoursOfWork,
+} from "@/lib/zanim";
+import type { Profile, WaitItem } from "@/lib/zanim";
 
 export function ItemCard({
   item,
   now,
+  profile,
   onBuy,
   onSkip,
   onExtend,
+  onRemove,
 }: {
   item: WaitItem;
   now: number;
+  profile: Profile;
   onBuy: () => void;
   onSkip: () => void;
   onExtend: () => void;
+  onRemove?: () => void;
 }) {
   const readyAt = new Date(item.readyAt).getTime();
   const ready = now >= readyAt;
   const remaining = readyAt - now;
   const total = Math.max(1, readyAt - new Date(item.createdAt).getTime());
   const progress = ready ? 100 : Math.min(100, Math.max(0, ((total - remaining) / total) * 100));
+  const work = hoursOfWork(
+    item.amountGrosze,
+    profile.monthlyIncomeGrosze,
+    profile.monthlyHours,
+  );
 
   return (
     <article className="card-hover overflow-hidden rounded-2xl border border-line/60 bg-surface shadow-card">
@@ -36,7 +51,12 @@ export function ItemCard({
               {categoryLabel(item.category)}
             </p>
             <h3 className="mt-1 truncate font-serif text-xl font-medium">{item.title}</h3>
-            <p className="mt-1 text-sm font-medium text-muted">{formatZl(item.amountGrosze)}</p>
+            <p className="mt-1 text-sm font-medium text-muted">
+              {formatZl(item.amountGrosze)}
+              {work != null ? (
+                <span className="text-subtle"> · ok. {formatHours(work)} pracy</span>
+              ) : null}
+            </p>
           </div>
           <span
             className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
@@ -59,6 +79,14 @@ export function ItemCard({
               Przedłuż
             </Button>
           </div>
+        ) : onRemove ? (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="mt-3 text-xs font-medium text-subtle underline-offset-2 hover:text-muted hover:underline"
+          >
+            Usuń z poczekalni
+          </button>
         ) : null}
       </div>
     </article>

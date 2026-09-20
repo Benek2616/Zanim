@@ -15,6 +15,15 @@ import {
   type WaitItem,
 } from "@/lib/zanim";
 
+function normalizeProfile(p: Partial<Profile> | Profile | undefined): Profile {
+  return {
+    displayName: p?.displayName ?? "",
+    monthlyIncomeGrosze: p?.monthlyIncomeGrosze ?? null,
+    monthlyHours: p?.monthlyHours ?? 160,
+    savingsGoalGrosze: p?.savingsGoalGrosze ?? null,
+  };
+}
+
 export type ZanimState = {
   hydrated: boolean;
   onboardingDone: boolean;
@@ -23,9 +32,11 @@ export type ZanimState = {
   profile: Profile;
   entitlements: Entitlements;
   review: Review | null;
+  lastToast: string | null;
   markHydrated: () => void;
   finishOnboarding: () => void;
   setDarkMode: (value: boolean) => void;
+  clearToast: () => void;
   addItem: (input: {
     title: string;
     amountGrosze: number;
@@ -64,9 +75,11 @@ export const useZanim = create<ZanimState>()(
       profile: DEFAULT_PROFILE,
       entitlements: DEFAULT_ENTITLEMENTS,
       review: null,
+      lastToast: null,
       markHydrated: () => set({ hydrated: true }),
       finishOnboarding: () => set({ onboardingDone: true }),
       setDarkMode: (value) => set({ darkMode: value }),
+      clearToast: () => set({ lastToast: null }),
       addItem: (input) => {
         const { items, entitlements } = get();
         const plus = plusActive(entitlements);
@@ -94,16 +107,23 @@ export const useZanim = create<ZanimState>()(
           readyAt: new Date(now + waitHours * 3_600_000).toISOString(),
           status: "waiting",
         };
-        set({ items: [item, ...items] });
+        set({ items: [item, ...items], lastToast: `„${item.title}” w poczekalni` });
         return { ok: true, id: item.id };
       },
       decide: (id, status) => {
+        const item = get().items.find((i) => i.id === id);
         set({
-          items: get().items.map((item) =>
-            item.id === id && item.status === "waiting"
-              ? { ...item, status, verdictAt: new Date().toISOString() }
-              : item,
+          items: get().items.map((i) =>
+            i.id === id && i.status === "waiting"
+              ? { ...i, status, verdictAt: new Date().toISOString() }
+              : i,
           ),
+          lastToast:
+            item && status === "skipped"
+              ? `Odpuszczasz ${item.title} — brawo`
+              : item && status === "bought"
+                ? `Kupujesz ${item.title}`
+                : null,
         });
       },
       extend: (id) => {
@@ -113,10 +133,11 @@ export const useZanim = create<ZanimState>()(
             const from = Math.max(Date.now(), new Date(item.readyAt).getTime());
             return { ...item, readyAt: new Date(from + item.waitHours * 3_600_000).toISOString() };
           }),
+          lastToast: "Przedłużono czas oddechu",
         });
       },
       remove: (id) => set({ items: get().items.filter((item) => item.id !== id) }),
-      setProfile: (patch) => set({ profile: { ...get().profile, ...patch } }),
+      setProfile: (patch) => set({ profile: normalizeProfile({ ...get().profile, ...patch }) }),
       activatePlus: (plan) => {
         const days = PLANS[plan].periodDays;
         const periodEnd = new Date(Date.now() + days * 86_400_000).toISOString();
@@ -147,6 +168,16 @@ export const useZanim = create<ZanimState>()(
     {
       name: "zanim.v1",
       skipHydration: true,
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<ZanimState>;
+        return {
+          ...current,
+          ...p,
+          profile: normalizeProfile(p.profile ?? current.profile),
+          hydrated: false,
+          lastToast: null,
+        };
+      },
       partialize: (state) => ({
         onboardingDone: state.onboardingDone,
         darkMode: state.darkMode,

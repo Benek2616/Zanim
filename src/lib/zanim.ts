@@ -102,6 +102,8 @@ export type Profile = {
   displayName: string;
   monthlyIncomeGrosze: number | null;
   monthlyHours: number;
+  /** Cel oszczędności w groszach; null = wyłączony */
+  savingsGoalGrosze: number | null;
 };
 
 export type Entitlements = {
@@ -195,10 +197,40 @@ export function pluralPl(n: number, one: string, few: string, many: string): str
   return many;
 }
 
+/** Passa: kolejne dni z co najmniej jednym "odpuszczam". */
+export function skipStreakDays(items: WaitItem[]): number {
+  const days = new Set(
+    items
+      .filter((i) => i.status === "skipped" && i.verdictAt)
+      .map((i) => new Date(i.verdictAt!).toISOString().slice(0, 10)),
+  );
+  if (days.size === 0) return 0;
+  let streak = 0;
+  const d = new Date();
+  for (;;) {
+    const key = d.toISOString().slice(0, 10);
+    if (!days.has(key)) {
+      if (streak === 0) {
+        d.setDate(d.getDate() - 1);
+        const y = d.toISOString().slice(0, 10);
+        if (!days.has(y)) return 0;
+        streak = 1;
+        d.setDate(d.getDate() - 1);
+        continue;
+      }
+      break;
+    }
+    streak += 1;
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
+
 export const DEFAULT_PROFILE: Profile = {
   displayName: "",
   monthlyIncomeGrosze: null,
   monthlyHours: 160,
+  savingsGoalGrosze: null,
 };
 
 export const DEFAULT_ENTITLEMENTS: Entitlements = {
