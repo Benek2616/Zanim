@@ -19,7 +19,9 @@ function isTabActive(to: string, pathname: string): boolean {
   if (to === "/") return pathname === "/";
   if (to === "/cennik") return pathname === "/cennik";
   if (to === "/raport") return pathname === "/raport";
-  return ["/konto", "/opinie", "/na-telefon", "/prywatnosc", "/regulamin"].includes(pathname);
+  return ["/konto", "/opinie", "/na-telefon", "/prywatnosc", "/regulamin", "/faq"].includes(
+    pathname,
+  );
 }
 
 function applyDarkClass(dark: boolean) {

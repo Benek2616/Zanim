@@ -12,6 +12,8 @@ import {
   ChevronRight,
   Sparkles,
   UserPlus,
+  HelpCircle,
+  Share2,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -24,6 +26,7 @@ export const Route = createFileRoute("/konto")({ component: KontoPage });
 const MENU = [
   { to: "/na-telefon" as const, label: "Na telefon", desc: "Zainstaluj jak aplikację", icon: Smartphone },
   { to: "/cennik" as const, label: "Plan Plus", desc: "Za konto — bez opłat", icon: Sparkles },
+  { to: "/faq" as const, label: "Pytania (FAQ)", desc: "Jak działa Zanim", icon: HelpCircle },
   { to: "/opinie" as const, label: "Opinie", desc: "Oceń Zanim", icon: MessageSquareHeart },
   { to: "/regulamin" as const, label: "Regulamin", desc: "Zasady korzystania", icon: ScrollText },
   { to: "/prywatnosc" as const, label: "Prywatność", desc: "Dane u Ciebie", icon: Shield },
@@ -57,6 +60,7 @@ function KontoPage() {
   const [regName, setRegName] = useState(profile.displayName);
   const [regEmail, setRegEmail] = useState(profile.email);
   const [regError, setRegError] = useState<string | null>(null);
+  const [shareMsg, setShareMsg] = useState<string | null>(null);
 
   function save() {
     const monthlyIncomeGrosze = income.trim() ? parseAmountToGrosze(income) : null;
@@ -86,6 +90,28 @@ function KontoPage() {
     createAccount({ displayName: regName, email: regEmail });
     setName(regName.trim());
     setEmail(regEmail.trim().toLowerCase());
+  }
+
+  async function shareApp() {
+    const url = typeof window !== "undefined" ? window.location.origin : "https://zanim.com.pl";
+    const text =
+      "Zanim — poczekalnia zakupów. Odczekaj 48 godzin, zanim wydasz pieniądze. " + url;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Zanim", text, url });
+        setShareMsg("Dzięki za polecenie.");
+      } else {
+        await navigator.clipboard.writeText(text);
+        setShareMsg("Link skopiowany — wklej znajomym.");
+      }
+    } catch {
+      try {
+        await navigator.clipboard.writeText(text);
+        setShareMsg("Link skopiowany.");
+      } catch {
+        setShareMsg(url);
+      }
+    }
   }
 
   function exportData() {
@@ -173,7 +199,6 @@ function KontoPage() {
         </p>
       </div>
 
-      {/* Konto = Plus */}
       <div className="rounded-2xl border border-line/70 bg-surface p-4 shadow-card">
         <div className="flex items-center gap-2 font-medium">
           <UserPlus className="size-4" />
@@ -222,6 +247,12 @@ function KontoPage() {
           </div>
         )}
       </div>
+
+      <Button variant="secondary" className="w-full" onClick={() => void shareApp()}>
+        <Share2 className="size-4" />
+        Poleć Zanim znajomym
+      </Button>
+      {shareMsg ? <p className="text-sm text-muted">{shareMsg}</p> : null}
 
       <div className="flex gap-1 rounded-xl bg-elevated/70 p-1">
         {(
