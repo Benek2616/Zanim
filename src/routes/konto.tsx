@@ -11,46 +11,24 @@ import {
   Shield,
   ChevronRight,
   Sparkles,
+  LogIn,
+  LogOut,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { downloadBackup, parseBackup } from "@/lib/data-io";
+import { billingConfigured, getSupabase } from "@/lib/supabase";
 import { isPlusActive, useZanim } from "@/lib/store";
 import { parseAmountToGrosze } from "@/lib/zanim";
 
 export const Route = createFileRoute("/konto")({ component: KontoPage });
 
 const MENU = [
-  {
-    to: "/na-telefon" as const,
-    label: "Na telefon",
-    desc: "Zainstaluj jak aplikację",
-    icon: Smartphone,
-  },
-  {
-    to: "/cennik" as const,
-    label: "Plan Plus",
-    desc: "Bez limitu i własny czas",
-    icon: Sparkles,
-  },
-  {
-    to: "/opinie" as const,
-    label: "Opinie",
-    desc: "Oceń Zanim",
-    icon: MessageSquareHeart,
-  },
-  {
-    to: "/regulamin" as const,
-    label: "Regulamin",
-    desc: "Zasady korzystania",
-    icon: ScrollText,
-  },
-  {
-    to: "/prywatnosc" as const,
-    label: "Prywatność",
-    desc: "Dane tylko u Ciebie",
-    icon: Shield,
-  },
+  { to: "/na-telefon" as const, label: "Na telefon", desc: "Zainstaluj jak aplikację", icon: Smartphone },
+  { to: "/cennik" as const, label: "Plan Plus", desc: "Bez limitu i własny czas", icon: Sparkles },
+  { to: "/opinie" as const, label: "Opinie", desc: "Oceń Zanim", icon: MessageSquareHeart },
+  { to: "/regulamin" as const, label: "Regulamin", desc: "Zasady korzystania", icon: ScrollText },
+  { to: "/prywatnosc" as const, label: "Prywatność", desc: "Dane tylko u Ciebie", icon: Shield },
 ];
 
 function KontoPage() {
@@ -75,6 +53,22 @@ function KontoPage() {
   const [saved, setSaved] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [tab, setTab] = useState<"profil" | "menu" | "dane">("menu");
+  const [authEmail, setAuthEmail] = useState("");
+  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
+  const [authMsg, setAuthMsg] = useState<string | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
+
+  useEffect(() => {
+    const sb = getSupabase();
+    if (!sb) return;
+    void sb.auth.getSession().then(({ data }) => {
+      setSessionEmail(data.session?.user.email ?? null);
+    });
+    const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
+      setSessionEmail(session?.user.email ?? null);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   function save() {
     const monthlyIncomeGrosze = income.trim() ? parseAmountToGrosze(income) : null;
@@ -88,6 +82,34 @@ function KontoPage() {
     });
     setSaved(true);
     window.setTimeout(() => setSaved(false), 2000);
+  }
+
+  async function sendMagicLink() {
+    const sb = getSupabase();
+    if (!sb) {
+      setAuthMsg("Supabase nie jest skonfigurowany (VITE_SUPABASE_*)." );
+      return;
+    }
+    if (!authEmail.includes("@")) {
+      setAuthMsg("Podaj poprawny e-mail.");
+      return;
+    }
+    setAuthBusy(true);
+    setAuthMsg(null);
+    const redirectTo = `${window.location.origin}/konto`;
+    const { error } = await sb.auth.signInWithOtp({
+      email: authEmail.trim(),
+      options: { emailRedirectTo: redirectTo },
+    });
+    setAuthBusy(false);
+    if (error) setAuthMsg(error.message);
+    else setAuthMsg("Sprawdź skrzynkę — wysłaliśmy link do logowania.");
+  }
+
+  async function signOut() {
+    const sb = getSupabase();
+    await sb?.auth.signOut();
+    setSessionEmail(null);
   }
 
   function exportData() {
@@ -123,15 +145,6 @@ function KontoPage() {
         entitlements: data.entitlements,
         review: data.review,
       });
-      setName(data.profile.displayName);
-      setIncome(
-        data.profile.monthlyIncomeGrosze != null
-          ? String(data.profile.monthlyIncomeGrosze / 100)
-          : "",
-      );
-      setHours(String(data.profile.monthlyHours));
-      const g = (data.profile as { savingsGoalGrosze?: number | null }).savingsGoalGrosze;
-      setGoal(g != null ? String(g / 100) : "");
       setMsg("Przywrócono dane z kopii.");
     } catch {
       setMsg("Nie udało się wczytać pliku.");
@@ -157,10 +170,6 @@ function KontoPage() {
       review: null,
       onboardingDone: true,
     });
-    setName("");
-    setIncome("");
-    setHours("160");
-    setGoal("");
     setMsg("Dane wyczyszczone.");
   }
 
@@ -173,6 +182,40 @@ function KontoPage() {
           Plan: <strong className="text-fg">{plus ? "Plus" : "Darmowy"}</strong>
           {profile.displayName ? ` · ${profile.displayName}` : ""}
         </p>
+      </div>
+
+      {/* Logowanie */}
+      <div className="rounded-2xl border border-line/70 bg-surface p-4 shadow-card">
+        <div className="flex items-center gap-2 font-medium">
+          {sessionEmail ? <LogOut className="size-4" /> : <LogIn className="size-4" />}
+          {sessionEmail ? "Sesja" : "Logowanie"}
+        </div>
+        {sessionEmail ? (
+          <div className="mt-2 space-y-2">
+            <p className="text-sm text-muted">{sessionEmail}</p>
+            <Button size="sm" variant="secondary" onClick={() => void signOut()}>
+              Wyloguj
+            </Button>
+          </div>
+        ) : billingConfigured ? (
+          <div className="mt-3 space-y-2">
+            <input
+              className="w-full rounded-xl border border-line bg-bg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-fg/20"
+              type="email"
+              placeholder="email@example.com"
+              value={authEmail}
+              onChange={(e) => setAuthEmail(e.target.value)}
+            />
+            <Button size="sm" disabled={authBusy} onClick={() => void sendMagicLink()}>
+              {authBusy ? "Wysyłanie…" : "Wyślij link do logowania"}
+            </Button>
+            {authMsg ? <p className="text-xs text-muted">{authMsg}</p> : null}
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-muted">
+            Logowanie włączy się po konfiguracji Supabase (patrz docs/SPRZEDAZ.md).
+          </p>
+        )}
       </div>
 
       <div className="flex gap-1 rounded-xl bg-elevated/70 p-1">
@@ -212,7 +255,6 @@ function KontoPage() {
               type="button"
               role="switch"
               aria-checked={darkMode}
-              aria-label="Przełącz tryb ciemny"
               className="theme-switch"
               data-on={darkMode ? "true" : "false"}
               onClick={() => setDarkMode(!darkMode)}
@@ -275,7 +317,7 @@ function KontoPage() {
             />
           </label>
           <label className="block">
-            <span className="text-sm text-muted">Cel oszczędności (zł) — opcjonalnie</span>
+            <span className="text-sm text-muted">Cel oszczędności (zł)</span>
             <input
               className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-3 outline-none focus:ring-2 focus:ring-fg/20"
               inputMode="decimal"
@@ -290,9 +332,6 @@ function KontoPage() {
 
       {tab === "dane" ? (
         <div className="space-y-3">
-          <p className="text-sm text-muted">
-            Wszystko jest lokalnie na tym urządzeniu. Możesz zrobić kopię albo wyczyścić dane.
-          </p>
           <Button variant="secondary" className="w-full" onClick={exportData}>
             <Download className="size-4" />
             Eksportuj kopię (JSON)
