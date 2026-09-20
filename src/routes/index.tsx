@@ -6,9 +6,21 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-[#f3efe6] px-6 text-center">
-      <h1 className="font-serif text-3xl font-medium text-[#1a1a1a]">Zanim</h1>
-      <p className="max-w-md text-[#4a4a4a]">
+    <main
+      style={{
+        minHeight: "100dvh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "1rem",
+        padding: "1.5rem",
+        textAlign: "center",
+        background: "#f3efe6",
+      }}
+    >
+      <h1 style={{ fontSize: "2rem", margin: 0 }}>Zanim</h1>
+      <p style={{ maxWidth: "28rem", color: "#4a4a4a", margin: 0 }}>
         Poczekalnia zakupów. Odczekaj 48 godzin, zanim wydasz pieniądze.
       </p>
     </main>
