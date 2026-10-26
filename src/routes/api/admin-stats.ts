@@ -1,6 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 
+function checkPassword(request: Request, expected: string) {
+  return request
+    .json()
+    .then((body: { password?: string; action?: string; kind?: string; value?: string; reason?: string }) => body)
+    .catch(() => ({ password: "" as string }));
+}
+
 export const Route = createFileRoute("/api/admin-stats")({
   server: {
     handlers: {
@@ -11,19 +18,14 @@ export const Route = createFileRoute("/api/admin-stats")({
             {
               ok: false,
               error:
-                "ADMIN_PASSWORD nie jest ustawione na serwerze (min. 6 znaków). Zrób Redeploy po dodaniu zmiennej.",
+                "ADMIN_PASSWORD nie jest ustawione na serwerze (min. 6 znaków).",
             },
             { status: 503 },
           );
         }
 
-        let password = "";
-        try {
-          const body = (await request.json()) as { password?: string };
-          password = (body?.password ?? "").trim();
-        } catch {
-          password = "";
-        }
+        const body = await checkPassword(request, expected);
+        const password = (body.password ?? "").trim();
 
         if (!password || password !== expected) {
           await new Promise((r) => setTimeout(r, 600));
@@ -48,16 +50,47 @@ export const Route = createFileRoute("/api/admin-stats")({
             uniqueVisitors7: 0,
             topPaths: [],
             recentVisits: [],
-            message:
-              "Brak VITE_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY — tracking wyłączony.",
+            dailyVisits: [],
+            bans: [],
+            message: "Brak konfiguracji Supabase.",
           });
         }
 
         const admin = createClient(supabaseUrl, serviceKey);
+
+        // Akcje ban / unban
+        if (body.action === "ban" && body.kind && body.value) {
+          const kind = body.kind === "email" ? "email" : "visitor";
+          const value =
+            kind === "email"
+              ? String(body.value).trim().toLowerCase()
+              : String(body.value).trim();
+          if (!value) {
+            return Response.json({ ok: false, error: "Pusta wartość bana." }, { status: 400 });
+          }
+          await admin.from("bans").upsert(
+            {
+              kind,
+              value,
+              reason: (body.reason ?? "").slice(0, 200) || null,
+            },
+            { onConflict: "kind,value" },
+          );
+        }
+
+        if (body.action === "unban" && body.kind && body.value) {
+          const kind = body.kind === "email" ? "email" : "visitor";
+          await admin
+            .from("bans")
+            .delete()
+            .eq("kind", kind)
+            .eq("value", String(body.value).trim());
+        }
+
         const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
         const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const since14 = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
 
-        // --- Signups ---
         const { count: total } = await admin
           .from("signups")
           .select("*", { count: "exact", head: true });
@@ -81,9 +114,8 @@ export const Route = createFileRoute("/api/admin-stats")({
           .from("signups")
           .select("email, display_name, plus, created_at")
           .order("created_at", { ascending: false })
-          .limit(20);
+          .limit(30);
 
-        // --- Visits ---
         const { count: visitsTotal } = await admin
           .from("visits")
           .select("*", { count: "exact", head: true });
@@ -102,7 +134,7 @@ export const Route = createFileRoute("/api/admin-stats")({
           .from("visits")
           .select("visitor_id")
           .gte("created_at", since7)
-          .limit(5000);
+          .limit(8000);
 
         const uniqueVisitors7 = new Set(
           (visits7rows ?? []).map((v) => v.visitor_id).filter(Boolean),
@@ -112,7 +144,7 @@ export const Route = createFileRoute("/api/admin-stats")({
           .from("visits")
           .select("path")
           .gte("created_at", since30)
-          .limit(3000);
+          .limit(4000);
 
         const pathCounts = new Map<string, number>();
         for (const row of pathRows ?? []) {
@@ -126,19 +158,46 @@ export const Route = createFileRoute("/api/admin-stats")({
 
         const { data: recentVisitRows } = await admin
           .from("visits")
-          .select("path, created_at, referrer")
+          .select("path, created_at, referrer, visitor_id")
           .order("created_at", { ascending: false })
-          .limit(25);
+          .limit(30);
+
+        // Wykres dzienny — 14 dni
+        const { data: dailyRows } = await admin
+          .from("visits")
+          .select("created_at")
+          .gte("created_at", since14)
+          .limit(8000);
+
+        const dayMap = new Map<string, number>();
+        for (let i = 13; i >= 0; i--) {
+          const d = new Date();
+          d.setHours(12, 0, 0, 0);
+          d.setDate(d.getDate() - i);
+          const key = d.toISOString().slice(0, 10);
+          dayMap.set(key, 0);
+        }
+        for (const row of dailyRows ?? []) {
+          const key = String(row.created_at).slice(0, 10);
+          if (dayMap.has(key)) dayMap.set(key, (dayMap.get(key) ?? 0) + 1);
+        }
+        const dailyVisits = [...dayMap.entries()].map(([date, count]) => ({ date, count }));
+
+        const { data: banRows } = await admin
+          .from("bans")
+          .select("kind, value, reason, created_at")
+          .order("created_at", { ascending: false })
+          .limit(50);
 
         const maskEmail = (email: string) => {
           const [local, domain] = email.split("@");
           if (!domain) return "***";
-          const visible = local.slice(0, Math.min(2, local.length));
-          return `${visible}***@${domain}`;
+          return `${local.slice(0, Math.min(2, local.length))}***@${domain}`;
         };
 
         const recent = (recentRows ?? []).map((r) => ({
           email: maskEmail(r.email),
+          emailRaw: r.email,
           displayName: r.display_name || "—",
           plus: Boolean(r.plus),
           createdAt: r.created_at,
@@ -148,6 +207,7 @@ export const Route = createFileRoute("/api/admin-stats")({
           path: v.path || "/",
           createdAt: v.created_at,
           referrer: v.referrer || null,
+          visitorId: v.visitor_id || "",
         }));
 
         return Response.json({
@@ -164,6 +224,8 @@ export const Route = createFileRoute("/api/admin-stats")({
           uniqueVisitors7,
           topPaths,
           recentVisits,
+          dailyVisits,
+          bans: banRows ?? [],
         });
       },
     },

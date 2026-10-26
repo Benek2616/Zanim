@@ -29,8 +29,20 @@ export const Route = createFileRoute("/api/track-signup")({
           return Response.json({ ok: false, error: "Nieprawidłowy e-mail." }, { status: 400 });
         }
 
-        const ua = request.headers.get("user-agent")?.slice(0, 300) ?? null;
         const admin = createClient(supabaseUrl, serviceKey);
+
+        const { data: ban } = await admin
+          .from("bans")
+          .select("id")
+          .eq("kind", "email")
+          .eq("value", email)
+          .maybeSingle();
+
+        if (ban) {
+          return Response.json({ ok: true, tracked: false, banned: true });
+        }
+
+        const ua = request.headers.get("user-agent")?.slice(0, 300) ?? null;
 
         const { error } = await admin.from("signups").upsert(
           {

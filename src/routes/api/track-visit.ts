@@ -29,7 +29,6 @@ export const Route = createFileRoute("/api/track-visit")({
           return Response.json({ ok: false }, { status: 400 });
         }
 
-        // nie loguj panelu admina
         if (path.startsWith("/zarzadzanie") || path.startsWith("/api")) {
           return Response.json({ ok: true, tracked: false });
         }
@@ -38,8 +37,20 @@ export const Route = createFileRoute("/api/track-visit")({
           return Response.json({ ok: true, tracked: false });
         }
 
-        const ua = request.headers.get("user-agent")?.slice(0, 300) ?? null;
         const admin = createClient(supabaseUrl, serviceKey);
+
+        const { data: ban } = await admin
+          .from("bans")
+          .select("id")
+          .eq("kind", "visitor")
+          .eq("value", visitorId)
+          .maybeSingle();
+
+        if (ban) {
+          return Response.json({ ok: true, tracked: false, banned: true });
+        }
+
+        const ua = request.headers.get("user-agent")?.slice(0, 300) ?? null;
 
         const { error } = await admin.from("visits").insert({
           visitor_id: visitorId,
