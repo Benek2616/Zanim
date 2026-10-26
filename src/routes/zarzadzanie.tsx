@@ -16,6 +16,7 @@ type Stats = {
   last30: number;
   recent: { email: string; displayName: string; plus: boolean; createdAt: string }[];
   message?: string;
+  error?: string;
 };
 
 const STORAGE_KEY = "zanim.admin.pw";
@@ -45,9 +46,22 @@ function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: pw }),
       });
-      const data = (await res.json().catch(() => ({}))) as Stats & { statusMessage?: string };
-      if (!res.ok) {
-        setError(data.statusMessage || "Błąd autoryzacji.");
+      const data = (await res.json().catch(() => ({}))) as Stats & {
+        statusMessage?: string;
+        message?: string;
+      };
+
+      if (!res.ok || data.ok === false) {
+        const msg =
+          data.error ||
+          data.statusMessage ||
+          data.message ||
+          (res.status === 401
+            ? "Złe hasło."
+            : res.status === 503
+              ? "Hasło nie jest ustawione na serwerze — zrób Redeploy."
+              : `Błąd ${res.status}`);
+        setError(msg);
         setStats(null);
         setSavedPw(null);
         try {
@@ -57,6 +71,7 @@ function AdminPage() {
         }
         return;
       }
+
       setStats(data);
       setSavedPw(pw);
       try {
@@ -65,7 +80,7 @@ function AdminPage() {
         /* ignore */
       }
     } catch {
-      setError("Nie udało się połączyć z serwerem.");
+      setError("Nie udało się połączyć z serwerem (/api/admin-stats).");
       setStats(null);
     } finally {
       setLoading(false);
@@ -106,7 +121,7 @@ function AdminPage() {
           </div>
         </div>
         <p className="text-sm text-muted">
-          Hasło ustawiasz w Vercel → Environment Variables jako <code className="text-fg">ADMIN_PASSWORD</code>.
+          Hasło: zmienna <code className="text-fg">ADMIN_PASSWORD</code> w Vercel (Production) + Redeploy.
         </p>
         <form onSubmit={login} className="space-y-3">
           <input

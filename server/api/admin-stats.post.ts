@@ -2,21 +2,27 @@ import { createClient } from "@supabase/supabase-js";
 
 /** POST /api/admin-stats — statystyki tylko z poprawnym ADMIN_PASSWORD */
 export default defineEventHandler(async (event) => {
-  const expected = process.env.ADMIN_PASSWORD;
+  setResponseHeader(event, "Content-Type", "application/json");
+
+  const expected = (process.env.ADMIN_PASSWORD ?? "").trim();
   if (!expected || expected.length < 6) {
-    throw createError({
-      statusCode: 503,
-      statusMessage: "ADMIN_PASSWORD nie jest ustawione (min. 6 znaków).",
-    });
+    setResponseStatus(event, 503);
+    return {
+      ok: false,
+      error: "ADMIN_PASSWORD nie jest ustawione na serwerze (min. 6 znaków). Zrób Redeploy po dodaniu zmiennej.",
+    };
   }
 
   const body = await readBody<{ password?: string }>(event).catch(() => null);
-  const password = body?.password ?? "";
+  const password = (body?.password ?? "").trim();
 
-  if (password !== expected) {
-    // Delikatne opóźnienie przeciw brute-force
-    await new Promise((r) => setTimeout(r, 800));
-    throw createError({ statusCode: 401, statusMessage: "Złe hasło." });
+  if (!password || password !== expected) {
+    await new Promise((r) => setTimeout(r, 600));
+    setResponseStatus(event, 401);
+    return {
+      ok: false,
+      error: "Złe hasło.",
+    };
   }
 
   const supabaseUrl = process.env.VITE_SUPABASE_URL;
@@ -67,7 +73,8 @@ export default defineEventHandler(async (event) => {
 
   if (e1 || e2 || e3 || e4 || e5) {
     console.error("[admin-stats]", e1 || e2 || e3 || e4 || e5);
-    throw createError({ statusCode: 500, statusMessage: "Błąd odczytu bazy." });
+    setResponseStatus(event, 500);
+    return { ok: false, error: "Błąd odczytu bazy (tabela signups?)." };
   }
 
   const maskEmail = (email: string) => {
