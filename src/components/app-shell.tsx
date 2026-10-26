@@ -1,12 +1,13 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Hourglass, Pause, PiggyBank, UserRound, Plus } from "lucide-react";
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { ZMark } from "@/components/mark";
 import { Onboarding } from "@/components/onboarding";
 import { ToastHost } from "@/components/toast";
 import { cn } from "@/lib/utils";
 import { setupPwa } from "@/lib/pwa";
 import { useZanim } from "@/lib/store";
+import { trackVisit } from "@/lib/analytics";
 
 const TABS = [
   { to: "/", label: "Poczekalnia", icon: Hourglass },
@@ -37,6 +38,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const darkMode = useZanim((s) => s.darkMode);
   const markHydrated = useZanim((s) => s.markHydrated);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const lastTracked = useRef<string | null>(null);
 
   const isAdmin = pathname === "/zarzadzanie";
 
@@ -48,6 +50,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     applyDarkClass(darkMode);
   }, [darkMode]);
+
+  // Tracking wizyt (max 1× na ścieżkę w danej sesji komponentu)
+  useEffect(() => {
+    if (!hydrated || isAdmin) return;
+    if (lastTracked.current === pathname) return;
+    lastTracked.current = pathname;
+    trackVisit(pathname);
+  }, [hydrated, pathname, isAdmin]);
 
   if (!hydrated) {
     return (
@@ -62,7 +72,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
-  // Panel admina — bez onboardingu i bez dolnych zakładek
   if (isAdmin) {
     return (
       <div className="mx-auto flex min-h-dvh max-w-md flex-col px-5 pt-[max(0.85rem,env(safe-area-inset-top))]">

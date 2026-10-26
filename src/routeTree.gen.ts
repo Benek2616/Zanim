@@ -13,6 +13,7 @@ import { Route as RegulaminRouteImport } from "./routes/regulamin";
 import { Route as ZarzadzanieRouteImport } from "./routes/zarzadzanie";
 import { Route as ApiAdminStatsRouteImport } from "./routes/api/admin-stats";
 import { Route as ApiTrackSignupRouteImport } from "./routes/api/track-signup";
+import { Route as ApiTrackVisitRouteImport } from "./routes/api/track-visit";
 
 const IndexRoute = IndexRouteImport.update({ id: "/", path: "/", getParentRoute: () => rootRouteImport } as any);
 const CennikRoute = CennikRouteImport.update({ id: "/cennik", path: "/cennik", getParentRoute: () => rootRouteImport } as any);
@@ -26,6 +27,7 @@ const RegulaminRoute = RegulaminRouteImport.update({ id: "/regulamin", path: "/r
 const ZarzadzanieRoute = ZarzadzanieRouteImport.update({ id: "/zarzadzanie", path: "/zarzadzanie", getParentRoute: () => rootRouteImport } as any);
 const ApiAdminStatsRoute = ApiAdminStatsRouteImport.update({ id: "/api/admin-stats", path: "/api/admin-stats", getParentRoute: () => rootRouteImport } as any);
 const ApiTrackSignupRoute = ApiTrackSignupRouteImport.update({ id: "/api/track-signup", path: "/api/track-signup", getParentRoute: () => rootRouteImport } as any);
+const ApiTrackVisitRoute = ApiTrackVisitRouteImport.update({ id: "/api/track-visit", path: "/api/track-visit", getParentRoute: () => rootRouteImport } as any);
 
 export const routeTree = rootRouteImport._addFileChildren({
   IndexRoute,
@@ -40,4 +42,5 @@ export const routeTree = rootRouteImport._addFileChildren({
   ZarzadzanieRoute,
   ApiAdminStatsRoute,
   ApiTrackSignupRoute,
+  ApiTrackVisitRoute,
 });

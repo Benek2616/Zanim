@@ -42,48 +42,93 @@ export const Route = createFileRoute("/api/admin-stats")({
             last7: 0,
             last30: 0,
             recent: [],
+            visitsTotal: 0,
+            visitsLast7: 0,
+            visitsLast30: 0,
+            uniqueVisitors7: 0,
+            topPaths: [],
+            recentVisits: [],
             message:
               "Brak VITE_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY — tracking wyłączony.",
           });
         }
 
         const admin = createClient(supabaseUrl, serviceKey);
+        const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-        const { count: total, error: e1 } = await admin
+        // --- Signups ---
+        const { count: total } = await admin
           .from("signups")
           .select("*", { count: "exact", head: true });
 
-        const { count: plus, error: e2 } = await admin
+        const { count: plus } = await admin
           .from("signups")
           .select("*", { count: "exact", head: true })
           .eq("plus", true);
 
-        const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-
-        const { count: last7, error: e3 } = await admin
+        const { count: last7 } = await admin
           .from("signups")
           .select("*", { count: "exact", head: true })
           .gte("created_at", since7);
 
-        const { count: last30, error: e4 } = await admin
+        const { count: last30 } = await admin
           .from("signups")
           .select("*", { count: "exact", head: true })
           .gte("created_at", since30);
 
-        const { data: recentRows, error: e5 } = await admin
+        const { data: recentRows } = await admin
           .from("signups")
           .select("email, display_name, plus, created_at")
           .order("created_at", { ascending: false })
-          .limit(30);
+          .limit(20);
 
-        if (e1 || e2 || e3 || e4 || e5) {
-          console.error("[admin-stats]", e1 || e2 || e3 || e4 || e5);
-          return Response.json(
-            { ok: false, error: "Błąd odczytu bazy (tabela signups?)." },
-            { status: 500 },
-          );
+        // --- Visits ---
+        const { count: visitsTotal } = await admin
+          .from("visits")
+          .select("*", { count: "exact", head: true });
+
+        const { count: visitsLast7 } = await admin
+          .from("visits")
+          .select("*", { count: "exact", head: true })
+          .gte("created_at", since7);
+
+        const { count: visitsLast30 } = await admin
+          .from("visits")
+          .select("*", { count: "exact", head: true })
+          .gte("created_at", since30);
+
+        const { data: visits7rows } = await admin
+          .from("visits")
+          .select("visitor_id")
+          .gte("created_at", since7)
+          .limit(5000);
+
+        const uniqueVisitors7 = new Set(
+          (visits7rows ?? []).map((v) => v.visitor_id).filter(Boolean),
+        ).size;
+
+        const { data: pathRows } = await admin
+          .from("visits")
+          .select("path")
+          .gte("created_at", since30)
+          .limit(3000);
+
+        const pathCounts = new Map<string, number>();
+        for (const row of pathRows ?? []) {
+          const p = row.path || "/";
+          pathCounts.set(p, (pathCounts.get(p) ?? 0) + 1);
         }
+        const topPaths = [...pathCounts.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
+          .map(([path, count]) => ({ path, count }));
+
+        const { data: recentVisitRows } = await admin
+          .from("visits")
+          .select("path, created_at, referrer")
+          .order("created_at", { ascending: false })
+          .limit(25);
 
         const maskEmail = (email: string) => {
           const [local, domain] = email.split("@");
@@ -99,6 +144,12 @@ export const Route = createFileRoute("/api/admin-stats")({
           createdAt: r.created_at,
         }));
 
+        const recentVisits = (recentVisitRows ?? []).map((v) => ({
+          path: v.path || "/",
+          createdAt: v.created_at,
+          referrer: v.referrer || null,
+        }));
+
         return Response.json({
           ok: true,
           configured: true,
@@ -107,6 +158,12 @@ export const Route = createFileRoute("/api/admin-stats")({
           last7: last7 ?? 0,
           last30: last30 ?? 0,
           recent,
+          visitsTotal: visitsTotal ?? 0,
+          visitsLast7: visitsLast7 ?? 0,
+          visitsLast30: visitsLast30 ?? 0,
+          uniqueVisitors7,
+          topPaths,
+          recentVisits,
         });
       },
     },
