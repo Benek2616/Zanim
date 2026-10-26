@@ -10,6 +10,7 @@ import { Route as OpinieRouteImport } from "./routes/opinie";
 import { Route as PrywatnoscRouteImport } from "./routes/prywatnosc";
 import { Route as RaportRouteImport } from "./routes/raport";
 import { Route as RegulaminRouteImport } from "./routes/regulamin";
+import { Route as ZarzadzanieRouteImport } from "./routes/zarzadzanie";
 
 const IndexRoute = IndexRouteImport.update({ id: "/", path: "/", getParentRoute: () => rootRouteImport } as any);
 const CennikRoute = CennikRouteImport.update({ id: "/cennik", path: "/cennik", getParentRoute: () => rootRouteImport } as any);
@@ -20,6 +21,7 @@ const OpinieRoute = OpinieRouteImport.update({ id: "/opinie", path: "/opinie", g
 const PrywatnoscRoute = PrywatnoscRouteImport.update({ id: "/prywatnosc", path: "/prywatnosc", getParentRoute: () => rootRouteImport } as any);
 const RaportRoute = RaportRouteImport.update({ id: "/raport", path: "/raport", getParentRoute: () => rootRouteImport } as any);
 const RegulaminRoute = RegulaminRouteImport.update({ id: "/regulamin", path: "/regulamin", getParentRoute: () => rootRouteImport } as any);
+const ZarzadzanieRoute = ZarzadzanieRouteImport.update({ id: "/zarzadzanie", path: "/zarzadzanie", getParentRoute: () => rootRouteImport } as any);
 
 export const routeTree = rootRouteImport._addFileChildren({
   IndexRoute,
@@ -31,4 +33,5 @@ export const routeTree = rootRouteImport._addFileChildren({
   PrywatnoscRoute,
   RaportRoute,
   RegulaminRoute,
+  ZarzadzanieRoute,
 });

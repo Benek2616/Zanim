@@ -38,6 +38,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const markHydrated = useZanim((s) => s.markHydrated);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+  const isAdmin = pathname === "/zarzadzanie";
+
   useEffect(() => {
     setupPwa();
     void Promise.resolve(useZanim.persist.rehydrate()).then(() => markHydrated());
@@ -56,6 +58,15 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <div className="mt-10 h-36 animate-pulse rounded-2xl bg-elevated/80" />
         <div className="mt-3 h-24 animate-pulse rounded-2xl bg-elevated/50" />
+      </div>
+    );
+  }
+
+  // Panel admina — bez onboardingu i bez dolnych zakładek
+  if (isAdmin) {
+    return (
+      <div className="mx-auto flex min-h-dvh max-w-md flex-col px-5 pt-[max(0.85rem,env(safe-area-inset-top))]">
+        <main className="flex-1 pb-10">{children}</main>
       </div>
     );
   }

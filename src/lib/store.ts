@@ -25,6 +25,17 @@ function normalizeProfile(p: Partial<Profile> | Profile | undefined): Profile {
   };
 }
 
+function trackSignup(displayName: string, email: string) {
+  if (typeof window === "undefined") return;
+  void fetch("/api/track-signup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ displayName, email }),
+  }).catch(() => {
+    /* tracking opcjonalny */
+  });
+}
+
 export type PendingUndo = {
   itemId: string;
   snapshot: WaitItem;
@@ -102,16 +113,19 @@ export const useZanim = create<ZanimState>()(
       clearToast: () => set({ lastToast: null }),
       clearLastSkip: () => set({ lastSkipId: null }),
       createAccount: ({ displayName, email }) => {
+        const name = displayName.trim();
+        const mail = email.trim().toLowerCase();
         set({
           profile: normalizeProfile({
             ...get().profile,
-            displayName: displayName.trim(),
-            email: email.trim().toLowerCase(),
+            displayName: name,
+            email: mail,
             accountCreated: true,
           }),
           entitlements: plusEntitlements(),
           lastToast: "Konto utworzone — Plus aktywny",
         });
+        trackSignup(name, mail);
       },
       deleteAccount: () => {
         set({
@@ -219,13 +233,6 @@ export const useZanim = create<ZanimState>()(
         const p = (persisted ?? {}) as Partial<ZanimState>;
         const profile = normalizeProfile(p.profile ?? current.profile);
         // konto = Plus
-        const entitlements = profile.accountCreated
-          ? plusEntitlements()
-          : (p.entitlements ?? current.entitlements)?.plus && !profile.accountCreated
-            ? DEFAULT_ENTITLEMENTS
-            : profile.accountCreated
-              ? plusEntitlements()
-              : (p.entitlements ?? DEFAULT_ENTITLEMENTS);
         return {
           ...current,
           ...p,
