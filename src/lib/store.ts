@@ -8,11 +8,14 @@ import {
   type CategoryId,
   type Entitlements,
   type ItemStatus,
+  type PriceTrack,
   type Profile,
   type Review,
   type SkipReasonId,
   type WaitItem,
 } from "@/lib/zanim";
+import { refreshPriceTrack } from "@/lib/prices";
+import { notifyPriceChange } from "@/lib/notify";
 
 function normalizeProfile(p: Partial<Profile> | Profile | undefined): Profile {
   return {
@@ -67,6 +70,7 @@ export type ZanimState = {
     category: CategoryId;
     note: string;
     waitHours: number;
+    priceTrack?: PriceTrack;
   }) => { ok: true; id: string } | { ok: false; error: string; code: "limit" | "plus" };
   decide: (
     id: string,
@@ -78,6 +82,8 @@ export type ZanimState = {
   remove: (id: string) => void;
   setProfile: (patch: Partial<Profile>) => void;
   setReview: (stars: number, body: string) => void;
+  /** Odświeża ceny śledzonych gier i pokazuje alerty przy zmianie. */
+  refreshTrackedPrices: () => Promise<void>;
 };
 
 function newId(): string {
@@ -164,6 +170,7 @@ export const useZanim = create<ZanimState>()(
           createdAt: new Date(now).toISOString(),
           readyAt: new Date(now + waitHours * 3_600_000).toISOString(),
           status: "waiting",
+          priceTrack: input.priceTrack,
         };
         set({ items: [item, ...items], lastToast: `„${item.title}” w poczekalni` });
         return { ok: true, id: item.id };
@@ -224,6 +231,48 @@ export const useZanim = create<ZanimState>()(
             createdAt: new Date().toISOString(),
           },
         });
+      },
+      refreshTrackedPrices: async () => {
+        const items = get().items.filter((i) => i.status === "waiting" && i.priceTrack);
+        if (items.length === 0) return;
+
+        const updates: { id: string; track: PriceTrack; changePct: number }[] = [];
+
+        for (const item of items) {
+          if (!item.priceTrack) continue;
+          try {
+            const result = await refreshPriceTrack(item.priceTrack);
+            if (!result) continue;
+            updates.push({ id: item.id, track: result.track, changePct: result.changePct });
+            if (result.changed) {
+              notifyPriceChange({
+                title: item.title,
+                changePct: result.changePct,
+                newPriceGrosze: result.track.lastPriceGrosze,
+                dealUrl: result.track.dealUrl,
+              });
+            }
+          } catch {
+            /* sieć / rate limit – pomijamy */
+          }
+        }
+
+        if (updates.length === 0) return;
+
+        set({
+          items: get().items.map((i) => {
+            const u = updates.find((x) => x.id === i.id);
+            if (!u) return i;
+            return { ...i, priceTrack: u.track };
+          }),
+        });
+
+        const drops = updates.filter((u) => u.changePct < -3);
+        if (drops.length === 1) {
+          set({ lastToast: `Spadek ceny: ${drops[0].changePct.toFixed(0)}% przy „${get().items.find((i) => i.id === drops[0].id)?.title}”` });
+        } else if (drops.length > 1) {
+          set({ lastToast: `Spadki cen przy ${drops.length} rzeczach` });
+        }
       },
     }),
     {
