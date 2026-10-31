@@ -16,7 +16,8 @@ import {
 import {
   formatUsd,
   makePriceTrack,
-  searchGamePrices,
+  searchPrices,
+  shopSearchLinks,
   usdToGrosze,
   type PriceResult,
 } from "@/lib/prices";
@@ -61,6 +62,7 @@ function NowePage() {
   const [priceResults, setPriceResults] = useState<PriceResult[] | null>(null);
   const [selectedTrack, setSelectedTrack] = useState<PriceTrack | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [lastSource, setLastSource] = useState<string | null>(null);
 
   const amountGroszePreview = parseAmountToGrosze(amount);
   const smartHours =
@@ -74,6 +76,8 @@ function NowePage() {
     );
   }, [title, items]);
 
+  const shopLinks = useMemo(() => shopSearchLinks(title), [title]);
+
   async function handleSearchPrice() {
     const q = title.trim();
     if (q.length < 2) {
@@ -84,14 +88,21 @@ function NowePage() {
     setSearchError(null);
     setPriceResults(null);
     setSelectedTrack(null);
+    setLastSource(null);
     try {
-      const results = await searchGamePrices(q);
+      const results = await searchPrices(q, category);
       setPriceResults(results);
       if (results.length === 0) {
-        setSearchError("Brak wyników w CheapShark (gry PC). Spróbuj innej nazwy lub wpisz cenę ręcznie.");
+        setSearchError(
+          "Brak wyników w katalogach. Sprawdź Allegro/Ceneo poniżej albo wpisz cenę ręcznie.",
+        );
+      } else {
+        const src = results[0]?.source;
+        setLastSource(src === "cheapshark" ? "CheapShark (gry PC)" : "katalog produktów (orientacyjnie)");
       }
-    } catch {
-      setSearchError("Nie udało się pobrać cen. Sprawdź internet i spróbuj ponownie.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Błąd sieci";
+      setSearchError(`Nie udało się pobrać cen: ${msg}`);
     } finally {
       setSearching(false);
     }
@@ -103,7 +114,11 @@ function NowePage() {
     setTitle(r.title);
     const grosze = usdToGrosze(r.cheapestPriceUsd);
     setAmount((grosze / 100).toFixed(grosze % 100 === 0 ? 0 : 2));
-    if (category === "inne") setCategory("hobby");
+    if (r.source === "cheapshark" && category === "inne") setCategory("hobby");
+    if (r.source === "upcitemdb" && category === "inne") {
+      // leave category or set elektronika as default for gadgets
+      setCategory("elektronika");
+    }
     if (plus) setWaitHours(suggestedWaitHours(grosze));
   }
 
@@ -146,6 +161,29 @@ function NowePage() {
         {tip}
       </div>
 
+      <div>
+        <p className="text-sm text-muted">Kategoria</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {CATEGORIES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => {
+                setCategory(c.id);
+                setPriceResults(null);
+                setSelectedTrack(null);
+              }}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-sm font-medium transition",
+                category === c.id ? "bg-fg text-accent-fg" : "bg-elevated text-fg",
+              )}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <label className="block">
         <span className="text-sm text-muted">Co chcesz kupić?</span>
         <input
@@ -156,7 +194,7 @@ function NowePage() {
             setSelectedTrack(null);
             setPriceResults(null);
           }}
-          placeholder="np. GTA 5, AirPods"
+          placeholder="np. GTA 5, AirPods, Nike, kurtka"
         />
       </label>
 
@@ -168,9 +206,25 @@ function NowePage() {
           disabled={searching || title.trim().length < 2}
           onClick={() => void handleSearchPrice()}
         >
-          {searching ? "Szukam…" : "Sprawdź cenę (gry PC)"}
+          {searching ? "Szukam…" : "Sprawdź cenę"}
         </Button>
       </div>
+
+      {shopLinks.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {shopLinks.map((l) => (
+            <a
+              key={l.label}
+              href={l.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full bg-elevated px-3 py-1.5 text-xs font-medium text-fg ring-1 ring-line"
+            >
+              {l.label} ↗
+            </a>
+          ))}
+        </div>
+      ) : null}
 
       {searchError ? (
         <p className="rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn">
@@ -180,12 +234,14 @@ function NowePage() {
 
       {priceResults && priceResults.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-sm text-muted">Wyniki z CheapShark (najniższa cena):</p>
+          <p className="text-sm text-muted">
+            Wyniki{lastSource ? ` · ${lastSource}` : ""} (najniższa / orientacyjna):
+          </p>
           <ul className="space-y-2">
             {priceResults.map((r) => {
               const selected = selectedTrack?.gameId === r.gameId;
               return (
-                <li key={r.gameId}>
+                <li key={`${r.source}-${r.gameId}`}>
                   <button
                     type="button"
                     onClick={() => selectResult(r)}
@@ -197,7 +253,10 @@ function NowePage() {
                     )}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium line-clamp-1">{r.title}</span>
+                      <span className="text-sm font-medium line-clamp-2">
+                        {r.brand ? `${r.brand} · ` : ""}
+                        {r.title}
+                      </span>
                       <span className="shrink-0 text-sm font-semibold">
                         {formatUsd(r.cheapestPriceUsd)}
                         <span className={cn("ml-1 text-xs", selected ? "opacity-70" : "text-muted")}>
@@ -212,7 +271,9 @@ function NowePage() {
           </ul>
           {selectedTrack ? (
             <p className="text-xs text-saved">
-              Śledzenie ceny włączone — dostaniesz alert przy spadku/wzroście.
+              {selectedTrack.source === "cheapshark"
+                ? "Śledzenie ceny włączone — alert przy spadku/wzroście (gry)."
+                : "Cena orientacyjna z katalogu — porównaj na Allegro/Ceneo i popraw kwotę jeśli trzeba."}
             </p>
           ) : null}
         </div>
@@ -238,25 +299,6 @@ function NowePage() {
           placeholder="np. 899"
         />
       </label>
-
-      <div>
-        <p className="text-sm text-muted">Kategoria</p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {CATEGORIES.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => setCategory(c.id)}
-              className={cn(
-                "rounded-full px-3 py-1.5 text-sm font-medium transition",
-                category === c.id ? "bg-fg text-accent-fg" : "bg-elevated text-fg",
-              )}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {plus ? (
         <div>
@@ -312,9 +354,9 @@ function NowePage() {
       </Button>
 
       <p className="text-2xs leading-relaxed text-subtle">
-        Ceny gier pochodzą z CheapShark (Steam i inne sklepy PC). Kurs ~3,85 zł/$. Przy
-        wyborze wyniku włączane jest śledzenie — przy następnym otwarciu aplikacji sprawdzimy
-        zmianę i wyślemy powiadomienie.
+        Gry PC: CheapShark (Steam i inne). Elektronika / ubrania / reszta: katalog UPCitemdb
+        (ceny orientacyjne w USD, przeliczone ~3,85 zł/$). Zawsze możesz poprawić kwotę i
+        sprawdzić Allegro / Ceneo / OLX.
       </p>
     </form>
   );
