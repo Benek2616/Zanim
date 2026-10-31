@@ -11,6 +11,7 @@ import {
   type SkipReasonId,
   type WaitItem,
 } from "@/lib/zanim";
+import { formatUsd } from "@/lib/prices";
 
 export function ItemCard({
   item,
@@ -41,6 +42,25 @@ export function ItemCard({
     profile.monthlyHours,
   );
 
+  const track = item.priceTrack;
+  let priceDelta: { pct: number; label: string } | null = null;
+  if (track && track.history.length >= 2) {
+    const first = track.history[0].priceUsd;
+    const last = track.lastPriceUsd;
+    if (first > 0) {
+      const pct = ((last - first) / first) * 100;
+      if (Math.abs(pct) >= 1) {
+        priceDelta = {
+          pct,
+          label:
+            pct < 0
+              ? `↓ ${Math.abs(pct).toFixed(0)}% od dodania`
+              : `↑ ${pct.toFixed(0)}% od dodania`,
+        };
+      }
+    }
+  }
+
   return (
     <article className="card-hover overflow-hidden rounded-2xl border border-line/60 bg-surface shadow-card">
       <div className="h-1 bg-elevated">
@@ -54,6 +74,7 @@ export function ItemCard({
           <div className="min-w-0">
             <p className="text-2xs font-semibold uppercase tracking-mark text-subtle">
               {categoryLabel(item.category)}
+              {track ? " · śledzona cena" : ""}
             </p>
             <h3 className="mt-1 truncate font-serif text-xl font-medium">{item.title}</h3>
             <p className="mt-1 text-sm font-medium text-muted">
@@ -62,6 +83,16 @@ export function ItemCard({
                 <span className="text-subtle"> · ok. {formatHours(work)} pracy</span>
               ) : null}
             </p>
+            {track ? (
+              <p className="mt-1 text-xs text-muted">
+                Aktualnie: {formatUsd(track.lastPriceUsd)} (~{formatZl(track.lastPriceGrosze)})
+                {priceDelta ? (
+                  <span className={priceDelta.pct < 0 ? " text-saved" : " text-warn"}>
+                    {" "}· {priceDelta.label}
+                  </span>
+                ) : null}
+              </p>
+            ) : null}
           </div>
           <span
             className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
@@ -72,6 +103,17 @@ export function ItemCard({
           </span>
         </div>
         {item.note ? <p className="mt-3 text-sm leading-relaxed text-muted">{item.note}</p> : null}
+
+        {track?.dealUrl ? (
+          <a
+            href={track.dealUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-block text-xs font-medium text-fg underline-offset-2 hover:underline"
+          >
+            Zobacz deal na CheapShark →
+          </a>
+        ) : null}
 
         {ready && pickingReason ? (
           <div className="mt-4">
