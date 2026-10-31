@@ -10,8 +10,17 @@ import {
   suggestedWaitHours,
   WAIT_OPTIONS,
   type CategoryId,
+  type PriceTrack,
 } from "@/lib/zanim";
+import {
+  formatUsd,
+  makePriceTrack,
+  searchGamePrices,
+  usdToGrosze,
+  type PriceResult,
+} from "@/lib/prices";
 import { cn } from "@/lib/utils";
+import { formatZl } from "@/lib/zanim";
 
 type NoweSearch = {
   title?: string;
@@ -48,6 +57,12 @@ function NowePage() {
   const [error, setError] = useState<string | null>(null);
   const tip = useMemo(() => PSYCHO_TIPS[Math.floor(Math.random() * PSYCHO_TIPS.length)], []);
 
+  // Price search state
+  const [searching, setSearching] = useState(false);
+  const [priceResults, setPriceResults] = useState<PriceResult[] | null>(null);
+  const [selectedTrack, setSelectedTrack] = useState<PriceTrack | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
   const amountGroszePreview = parseAmountToGrosze(amount);
   const smartHours =
     amountGroszePreview != null ? suggestedWaitHours(amountGroszePreview) : FREE_WAIT_HOURS;
@@ -59,6 +74,39 @@ function NowePage() {
       (i) => i.status === "waiting" && i.title.trim().toLowerCase() === t,
     );
   }, [title, items]);
+
+  async function handleSearchPrice() {
+    const q = title.trim();
+    if (q.length < 2) {
+      setSearchError("Wpisz co najmniej 2 znaki.");
+      return;
+    }
+    setSearching(true);
+    setSearchError(null);
+    setPriceResults(null);
+    setSelectedTrack(null);
+    try {
+      const results = await searchGamePrices(q);
+      setPriceResults(results);
+      if (results.length === 0) {
+        setSearchError("Brak wyników w CheapShark (gry PC). Spróbuj innej nazwy lub wpisz cenę ręcznie.");
+      }
+    } catch {
+      setSearchError("Nie udało się pobrać cen. Sprawdź internet i spróbuj ponownie.");
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function selectResult(r: PriceResult) {
+    const track = makePriceTrack(r);
+    setSelectedTrack(track);
+    setTitle(r.title);
+    const grosze = usdToGrosze(r.cheapestPriceUsd);
+    setAmount((grosze / 100).toFixed(grosze % 100 === 0 ? 0 : 2));
+    if (category === "inne") setCategory("hobby");
+    if (plus) setWaitHours(suggestedWaitHours(grosze));
+  }
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -78,6 +126,7 @@ function NowePage() {
       category,
       note,
       waitHours: hours,
+      priceTrack: selectedTrack ?? undefined,
     });
     if (!result.ok) {
       setError(result.error);
@@ -103,10 +152,72 @@ function NowePage() {
         <input
           className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-3 text-base outline-none focus:ring-2 focus:ring-fg/20"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="np. AirPods"
+          onChange={(e) => {
+            setTitle(e.target.value);
+            setSelectedTrack(null);
+            setPriceResults(null);
+          }}
+          placeholder="np. GTA 5, AirPods"
         />
       </label>
+
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          className="flex-1"
+          disabled={searching || title.trim().length < 2}
+          onClick={() => void handleSearchPrice()}
+        >
+          {searching ? "Szukam…" : "Sprawdź cenę (gry PC)"}
+        </Button>
+      </div>
+
+      {searchError ? (
+        <p className="rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn">
+          {searchError}
+        </p>
+      ) : null}
+
+      {priceResults && priceResults.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-sm text-muted">Wyniki z CheapShark (najniższa cena):</p>
+          <ul className="space-y-2">
+            {priceResults.map((r) => {
+              const selected = selectedTrack?.gameId === r.gameId;
+              return (
+                <li key={r.gameId}>
+                  <button
+                    type="button"
+                    onClick={() => selectResult(r)}
+                    className={cn(
+                      "w-full rounded-xl border px-3 py-2.5 text-left transition",
+                      selected
+                        ? "border-fg bg-fg text-accent-fg"
+                        : "border-line bg-surface hover:bg-elevated",
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium line-clamp-1">{r.title}</span>
+                      <span className="shrink-0 text-sm font-semibold">
+                        {formatUsd(r.cheapestPriceUsd)}
+                        <span className={cn("ml-1 text-xs", selected ? "opacity-70" : "text-muted")}>
+                          (~{formatZl(usdToGrosze(r.cheapestPriceUsd))})
+                        </span>
+                      </span>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {selectedTrack ? (
+            <p className="text-xs text-saved">
+              Śledzenie ceny włączone — dostaniesz alert przy spadku/wzroście.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {duplicate ? (
         <p className="rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn">
@@ -200,6 +311,12 @@ function NowePage() {
       <Button type="submit" className="w-full" size="lg">
         Wrzuć do poczekalni
       </Button>
+
+      <p className="text-2xs leading-relaxed text-subtle">
+        Ceny gier pochodzą z CheapShark (Steam i inne sklepy PC). Kurs ~3,85 zł/$. Przy
+        wyborze wyniku włączane jest śledzenie — przy następnym otwarciu aplikacji sprawdzimy
+        zmianę i wyślemy powiadomienie.
+      </p>
     </form>
   );
 }
