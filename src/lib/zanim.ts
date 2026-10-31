@@ -58,7 +58,7 @@ export const PLANS: Record<
       "Stałe 48 godzin oddechu",
       "Werdykt: kupuję albo odpuszczam",
       "Historia decyzji",
-      "Śledzenie cen gier (CheapShark)",
+      "Ceny gier + elektroniki / ubrań",
     ],
   },
   plus_month: {
@@ -94,9 +94,8 @@ export const FREE_WAIT_HOURS = 48;
 
 export type ItemStatus = "waiting" | "bought" | "skipped";
 
-/** Price tracking attached to a wait item (game deals via CheapShark). */
 export type PriceTrack = {
-  source: "cheapshark";
+  source: "cheapshark" | "upcitemdb";
   gameId: string;
   title: string;
   lastPriceUsd: number;
@@ -119,7 +118,6 @@ export type WaitItem = {
   status: ItemStatus;
   verdictAt?: string;
   skipReason?: SkipReasonId;
-  /** Optional live price tracking (e.g. PC game deals). */
   priceTrack?: PriceTrack;
 };
 
