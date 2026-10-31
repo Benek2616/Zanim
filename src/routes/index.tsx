@@ -52,6 +52,7 @@ function Home() {
   const decide = useZanim((s) => s.decide);
   const extend = useZanim((s) => s.extend);
   const remove = useZanim((s) => s.remove);
+  const refreshTrackedPrices = useZanim((s) => s.refreshTrackedPrices);
   const [now, setNow] = useState(() => Date.now());
   const [filter, setFilter] = useState<Filter>("all");
   const [tipIndex, setTipIndex] = useState(0);
@@ -68,6 +69,18 @@ function Home() {
     const id = window.setInterval(() => setTipIndex((i) => (i + 1) % TIPS.length), 6000);
     return () => window.clearInterval(id);
   }, []);
+
+  // Odśwież ceny śledzonych gier przy wejściu na stronę (max raz na sesję)
+  useEffect(() => {
+    const key = "zanim.prices-refreshed";
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch {
+      /* ignore */
+    }
+    void refreshTrackedPrices();
+  }, [refreshTrackedPrices]);
 
   const waiting = useMemo(() => items.filter((i) => i.status === "waiting"), [items]);
   const skippedSum = useMemo(
@@ -141,7 +154,6 @@ function Home() {
         </div>
       </div>
 
-      {/* Ten tydzień */}
       <div className="mt-4 rounded-2xl border border-line/60 bg-surface p-4 shadow-card">
         <p className="text-2xs font-semibold uppercase tracking-mark text-subtle">Ten tydzień</p>
         <div className="mt-2 flex items-end justify-between gap-3">
@@ -200,7 +212,7 @@ function Home() {
       {perm === "default" ? (
         <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 py-3 shadow-card">
           <p className="text-sm leading-snug text-muted">
-            Włącz powiadomienia — damy znać, gdy czas minie.
+            Włącz powiadomienia — damy znać, gdy czas minie lub spadnie cena.
           </p>
           <Button
             size="sm"
