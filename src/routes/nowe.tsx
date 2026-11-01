@@ -97,7 +97,7 @@ function NowePage() {
       setPriceResults(results);
       if (results.length === 0) {
         setSearchError(
-          "Brak wyników. Sprawdź Steam / Allegro / Ceneo poniżej albo wpisz cenę ręcznie.",
+          "Brak wyników. Spróbuj pełniejszej nazwy (np. „Grand Theft Auto V”) albo sprawdź Steam poniżej.",
         );
       }
     } catch (e) {
@@ -194,7 +194,7 @@ function NowePage() {
             setSelectedTrack(null);
             setPriceResults(null);
           }}
-          placeholder="np. Wiedźmin 3, GTA 5, AirPods"
+          placeholder="np. GTA 5, Wiedźmin 3, AirPods"
         />
       </label>
 
@@ -234,7 +234,7 @@ function NowePage() {
 
       {priceResults && priceResults.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-sm text-muted">Wyniki (najtańsze najpierw):</p>
+          <p className="text-sm text-muted">Wyniki ({priceResults.length}):</p>
           <ul className="space-y-2">
             {priceResults.map((r) => {
               const selected = selectedTrack?.gameId === r.gameId;
@@ -244,44 +244,55 @@ function NowePage() {
                     type="button"
                     onClick={() => selectResult(r)}
                     className={cn(
-                      "w-full rounded-xl border px-3 py-2.5 text-left transition",
+                      "flex w-full items-center gap-3 rounded-xl border px-2.5 py-2 text-left transition",
                       selected
                         ? "border-fg bg-fg text-accent-fg"
                         : "border-line bg-surface hover:bg-elevated",
                     )}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <span className="text-sm font-medium line-clamp-2">
-                          {r.brand ? `${r.brand} · ` : ""}
-                          {r.title}
-                        </span>
-                        <span
-                          className={cn(
-                            "mt-0.5 block text-2xs",
-                            selected ? "opacity-70" : "text-subtle",
-                          )}
-                        >
-                          {sourceLabel(r.source)}
-                          {r.discountPercent
-                            ? ` · −${r.discountPercent}%`
-                            : ""}
-                        </span>
-                      </div>
-                      <span className="shrink-0 text-right text-sm font-semibold">
-                        {formatZl(r.priceGrosze)}
-                        {r.currency === "USD" ? (
-                          <span
-                            className={cn(
-                              "mt-0.5 block text-2xs font-normal",
-                              selected ? "opacity-70" : "text-muted",
-                            )}
-                          >
-                            {formatUsd(r.cheapestPriceUsd)}
-                          </span>
-                        ) : null}
+                    {r.thumb ? (
+                      <img
+                        src={r.thumb}
+                        alt=""
+                        width={88}
+                        height={33}
+                        loading="lazy"
+                        className="h-10 w-[88px] shrink-0 rounded-md object-cover bg-elevated"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <div className="h-10 w-[88px] shrink-0 rounded-md bg-elevated" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium line-clamp-2">
+                        {r.brand ? `${r.brand} · ` : ""}
+                        {r.title}
+                      </span>
+                      <span
+                        className={cn(
+                          "mt-0.5 block text-2xs",
+                          selected ? "opacity-70" : "text-subtle",
+                        )}
+                      >
+                        {sourceLabel(r.source)}
+                        {r.discountPercent ? ` · −${r.discountPercent}%` : ""}
                       </span>
                     </div>
+                    <span className="shrink-0 text-right text-sm font-semibold">
+                      {formatZl(r.priceGrosze)}
+                      {r.currency === "USD" ? (
+                        <span
+                          className={cn(
+                            "mt-0.5 block text-2xs font-normal",
+                            selected ? "opacity-70" : "text-muted",
+                          )}
+                        >
+                          {formatUsd(r.cheapestPriceUsd)}
+                        </span>
+                      ) : null}
+                    </span>
                   </button>
                 </li>
               );
@@ -372,8 +383,8 @@ function NowePage() {
       </Button>
 
       <p className="text-2xs leading-relaxed text-subtle">
-        Gry: <strong>Steam</strong> (ceny w zł, sklep PL) + CheapShark (inne sklepy PC).
-        Elektronika / ubrania: katalog orientacyjny. Link do oferty Steam przy śledzeniu.
+        Gry: Steam (PLN + okładki) i CheapShark. Skróty typu „GTA 5” są rozwijane automatycznie.
+        Nie każda darmowa / usunięta gra ma cenę w API.
       </p>
     </form>
   );

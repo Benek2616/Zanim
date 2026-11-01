@@ -1,18 +1,15 @@
 /**
  * Price lookup & tracking.
- * - Gry: Steam (ceny PLN) + CheapShark (inne sklepy PC)
+ * - Gry: Steam (ceny PLN + okładki) + CheapShark
  * - Reszta: UPCitemdb (orientacyjne USD)
  */
 
 export type PriceSource = "steam" | "cheapshark" | "upcitemdb";
 
 export type PriceResult = {
-  /** External id: Steam appId, CheapShark gameID, or UPC/EAN */
   gameId: string;
   title: string;
-  /** Always set — for UI and tracking in grosze (1 zł = 100). */
   priceGrosze: number;
-  /** USD equivalent when source is not PLN-native. */
   cheapestPriceUsd: number;
   currency: "PLN" | "USD";
   cheapestDealId?: string;
@@ -45,8 +42,40 @@ const UPC_BASE = "https://api.upcitemdb.com/prod/trial/search";
 
 const USD_TO_PLN = 3.85;
 
+/** Common short names → better Steam search terms */
+const QUERY_ALIASES: Record<string, string[]> = {
+  gta: ["grand theft auto", "gta v", "gta 5"],
+  "gta 5": ["grand theft auto v", "gta v enhanced"],
+  "gta v": ["grand theft auto v", "gta v enhanced"],
+  "gta5": ["grand theft auto v"],
+  rdr2: ["red dead redemption 2"],
+  rdr: ["red dead redemption"],
+  witcher: ["wiedźmin", "the witcher"],
+  wiedźmin: ["the witcher", "wiedźmin"],
+  "witcher 3": ["the witcher 3", "wiedźmin 3"],
+  cyberpunk: ["cyberpunk 2077"],
+  cs2: ["counter-strike 2"],
+  csgo: ["counter-strike"],
+  elden: ["elden ring"],
+  hogwarts: ["hogwarts legacy"],
+  fifa: ["ea sports fc", "fifa"],
+  fc24: ["ea sports fc 24"],
+  fc25: ["ea sports fc 25"],
+  fc26: ["ea sports fc 26"],
+  lol: ["league of legends"],
+  valorant: ["valorant"],
+  minecraft: ["minecraft"],
+  skyrim: ["the elder scrolls v skyrim"],
+  fallout: ["fallout"],
+  sekiro: ["sekiro"],
+  bloodborne: ["bloodborne"],
+  god: ["god of war"],
+  spiderman: ["marvel spider-man"],
+  "spider-man": ["marvel spider-man"],
+};
+
 const GAME_HINT =
-  /\b(gta|game|gra|steam|rpg|fps|xbox|playstation|nintendo|witcher|wiedźmin|cyberpunk|elden|minecraft|fortnite|valorant|cs2|csgo|hogwarts|red dead)\b/i;
+  /\b(gta|game|gra|steam|rpg|fps|xbox|playstation|nintendo|witcher|wiedźmin|cyberpunk|elden|minecraft|fortnite|valorant|cs2|csgo|hogwarts|red dead|rdr|fifa|skyrim|fallout)\b/i;
 
 export function usdToGrosze(usd: number): number {
   return Math.round(usd * USD_TO_PLN * 100);
@@ -66,6 +95,23 @@ export function looksLikeGame(query: string, category?: string): boolean {
   return GAME_HINT.test(query);
 }
 
+export function steamCapsule(appId: string): string {
+  return `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/capsule_231x87.jpg`;
+}
+
+export function steamHeader(appId: string): string {
+  return `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/header.jpg`;
+}
+
+function expandQueries(query: string): string[] {
+  const q = query.trim();
+  const lower = q.toLowerCase();
+  const extra = QUERY_ALIASES[lower] ?? [];
+  // Also try without digits spacing: "gta5" etc.
+  const set = new Set<string>([q, ...extra]);
+  return [...set].slice(0, 4);
+}
+
 /** Unified search by category / keywords. */
 export async function searchPrices(
   query: string,
@@ -82,28 +128,51 @@ export async function searchPrices(
   return searchGeneralPrices(q);
 }
 
-/**
- * Games: Steam first (real PLN), then CheapShark for other store deals.
- * Results are merged — Steam apps preferred, CheapShark fills gaps / other deals.
- */
+/** Games: Steam (expanded queries) + CheapShark, merged & sorted. */
 export async function searchGamePrices(query: string): Promise<PriceResult[]> {
-  const [steam, cheap] = await Promise.all([
-    searchSteamPrices(query).catch(() => [] as PriceResult[]),
-    searchCheapSharkPrices(query).catch(() => [] as PriceResult[]),
-  ]);
+  const terms = expandQueries(query);
 
-  // Prefer Steam (PLN), then CheapShark; dedupe by steamAppId when possible
-  const seenSteam = new Set(
-    steam.map((r) => r.steamAppId).filter(Boolean) as string[],
+  const steamBatches = await Promise.all(
+    terms.map((t) => searchSteamPrices(t).catch(() => [] as PriceResult[])),
   );
+  const cheap = await searchCheapSharkPrices(query).catch(() => [] as PriceResult[]);
+
+  // Merge Steam by appId
+  const byApp = new Map<string, PriceResult>();
+  for (const batch of steamBatches) {
+    for (const r of batch) {
+      const key = r.steamAppId || r.gameId;
+      if (!byApp.has(key)) byApp.set(key, r);
+    }
+  }
+  let steam = [...byApp.values()];
+
+  // Fill missing prices via appdetails (e.g. DLC / incomplete search payload)
+  const missing = steam.filter((r) => !r.priceGrosze || r.priceGrosze <= 0);
+  if (missing.length > 0) {
+    const filled = await Promise.all(
+      missing.slice(0, 6).map(async (r) => {
+        const appId = r.steamAppId;
+        if (!appId) return r;
+        const fresh = await fetchSteamPrice(appId).catch(() => null);
+        return fresh ?? r;
+      }),
+    );
+    const fillMap = new Map(filled.map((r) => [r.steamAppId || r.gameId, r]));
+    steam = steam
+      .map((r) => fillMap.get(r.steamAppId || r.gameId) ?? r)
+      .filter((r) => r.priceGrosze > 0);
+  } else {
+    steam = steam.filter((r) => r.priceGrosze > 0);
+  }
+
+  const seenSteam = new Set(steam.map((r) => r.steamAppId).filter(Boolean) as string[]);
   const merged = [
     ...steam,
     ...cheap.filter((r) => !r.steamAppId || !seenSteam.has(r.steamAppId)),
   ];
 
-  return merged
-    .sort((a, b) => a.priceGrosze - b.priceGrosze)
-    .slice(0, 10);
+  return merged.sort((a, b) => a.priceGrosze - b.priceGrosze).slice(0, 12);
 }
 
 /** Steam Store search — prices in PLN (cc=PL). */
@@ -111,21 +180,17 @@ export async function searchSteamPrices(query: string): Promise<PriceResult[]> {
   const q = query.trim();
   if (q.length < 2) return [];
 
-  const url =
-    `${STEAM_SEARCH}?term=${encodeURIComponent(q)}&l=polish&cc=PL`;
+  const url = `${STEAM_SEARCH}?term=${encodeURIComponent(q)}&l=polish&cc=PL`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Steam search: ${res.status}`);
 
   const data: {
+    total?: number;
     items?: Array<{
       id?: number;
       name?: string;
       tiny_image?: string;
-      price?: {
-        currency?: string;
-        initial?: number;
-        final?: number;
-      };
+      price?: { currency?: string; initial?: number; final?: number };
     }>;
   } = await res.json();
 
@@ -133,24 +198,23 @@ export async function searchSteamPrices(query: string): Promise<PriceResult[]> {
   for (const item of data.items ?? []) {
     const appId = item.id != null ? String(item.id) : "";
     if (!appId) continue;
-    // Steam returns price in smallest unit (grosze for PLN)
-    const final = Number(item.price?.final);
-    if (!Number.isFinite(final) || final <= 0) continue; // free / no price — skip
 
+    const final = Number(item.price?.final);
+    const hasPrice = Number.isFinite(final) && final > 0;
     const initial = Number(item.price?.initial) || final;
     const discount =
-      initial > final && initial > 0
+      hasPrice && initial > final && initial > 0
         ? Math.round(((initial - final) / initial) * 100)
         : 0;
 
     results.push({
       gameId: `steam:${appId}`,
       title: String(item.name || "Gra Steam"),
-      priceGrosze: final,
-      cheapestPriceUsd: final / 100 / USD_TO_PLN,
+      priceGrosze: hasPrice ? final : 0,
+      cheapestPriceUsd: hasPrice ? final / 100 / USD_TO_PLN : 0,
       currency: "PLN",
       steamAppId: appId,
-      thumb: item.tiny_image,
+      thumb: item.tiny_image || steamCapsule(appId),
       dealUrl: `https://store.steampowered.com/app/${appId}`,
       source: "steam",
       discountPercent: discount > 0 ? discount : undefined,
@@ -164,7 +228,7 @@ export async function searchCheapSharkPrices(query: string): Promise<PriceResult
   const q = query.trim();
   if (q.length < 2) return [];
 
-  const url = `${CS_BASE}/games?title=${encodeURIComponent(q)}&limit=12`;
+  const url = `${CS_BASE}/games?title=${encodeURIComponent(q)}&limit=20`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`CheapShark: ${res.status}`);
 
@@ -181,6 +245,7 @@ export async function searchCheapSharkPrices(query: string): Promise<PriceResult
     const price = Number(g.cheapest ?? g.cheapestPriceUSD);
     if (!Number.isFinite(price) || price <= 0) continue;
     const dealId = g.cheapestDealID != null ? String(g.cheapestDealID) : undefined;
+    const steamAppId = g.steamAppID != null ? String(g.steamAppID) : undefined;
     const grosze = usdToGrosze(price);
     results.push({
       gameId,
@@ -189,18 +254,15 @@ export async function searchCheapSharkPrices(query: string): Promise<PriceResult
       cheapestPriceUsd: price,
       currency: "USD",
       cheapestDealId: dealId,
-      steamAppId: g.steamAppID != null ? String(g.steamAppID) : undefined,
-      thumb: g.thumb != null ? String(g.thumb) : undefined,
+      steamAppId,
+      thumb:
+        (g.thumb != null ? String(g.thumb) : undefined) ||
+        (steamAppId ? steamCapsule(steamAppId) : undefined),
       dealUrl: dealId ? CS_DEAL + dealId : undefined,
       source: "cheapshark",
     });
   }
   return results;
-}
-
-/** @deprecated use searchGamePrices */
-export async function searchGamePricesLegacy(query: string) {
-  return searchCheapSharkPrices(query);
 }
 
 /** General products via UPCitemdb trial. */
@@ -294,7 +356,7 @@ export async function fetchSteamPrice(appId: string): Promise<PriceResult | null
     cheapestPriceUsd: final / 100 / USD_TO_PLN,
     currency: "PLN",
     steamAppId: appId,
-    thumb: entry.data.header_image,
+    thumb: entry.data.header_image || steamHeader(appId),
     dealUrl: `https://store.steampowered.com/app/${appId}`,
     source: "steam",
     discountPercent: overview?.discount_percent || undefined,
@@ -315,6 +377,7 @@ export async function fetchGameDeal(gameId: string): Promise<PriceResult | null>
   const price = Number(data.cheapestPriceUSD ?? data.deals?.[0]?.price);
   if (!Number.isFinite(price) || price <= 0) return null;
   const dealId = data.deals?.[0]?.dealID;
+  const steamAppId = data.info?.steamAppID;
   const grosze = usdToGrosze(price);
 
   return {
@@ -324,8 +387,9 @@ export async function fetchGameDeal(gameId: string): Promise<PriceResult | null>
     cheapestPriceUsd: price,
     currency: "USD",
     cheapestDealId: dealId,
-    steamAppId: data.info?.steamAppID,
-    thumb: data.info?.thumb,
+    steamAppId,
+    thumb:
+      data.info?.thumb || (steamAppId ? steamCapsule(steamAppId) : undefined),
     dealUrl: dealId ? CS_DEAL + dealId : undefined,
     source: "cheapshark",
   };
@@ -360,7 +424,6 @@ export async function refreshPriceTrack(
   } else if (track.source === "cheapshark") {
     fresh = await fetchGameDeal(track.gameId);
   } else {
-    // upcitemdb — no reliable re-fetch by id
     return null;
   }
 
@@ -393,7 +456,6 @@ export async function refreshPriceTrack(
   };
 }
 
-/** Deep links to shops for manual check. */
 export function shopSearchLinks(query: string): { label: string; url: string }[] {
   const q = encodeURIComponent(query.trim());
   if (!query.trim()) return [];

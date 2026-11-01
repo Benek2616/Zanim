@@ -61,6 +61,15 @@ export function ItemCard({
     }
   }
 
+  const dealLabel =
+    track?.source === "steam"
+      ? "Zobacz na Steam →"
+      : track?.source === "cheapshark"
+        ? "Zobacz deal →"
+        : track?.dealUrl
+          ? "Zobacz ofertę →"
+          : null;
+
   return (
     <article className="card-hover overflow-hidden rounded-2xl border border-line/60 bg-surface shadow-card">
       <div className="h-1 bg-elevated">
@@ -69,6 +78,21 @@ export function ItemCard({
           style={{ width: `${progress}%` }}
         />
       </div>
+
+      {track?.thumb ? (
+        <div className="relative aspect-[460/215] w-full bg-elevated">
+          <img
+            src={track.thumb}
+            alt=""
+            className="h-full w-full object-cover"
+            loading="lazy"
+            onError={(e) => {
+              (e.target as HTMLImageElement).parentElement!.style.display = "none";
+            }}
+          />
+        </div>
+      ) : null}
+
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -85,7 +109,10 @@ export function ItemCard({
             </p>
             {track ? (
               <p className="mt-1 text-xs text-muted">
-                Aktualnie: {formatUsd(track.lastPriceUsd)} (~{formatZl(track.lastPriceGrosze)})
+                Aktualnie: {formatZl(track.lastPriceGrosze)}
+                {track.source !== "steam" ? (
+                  <span> ({formatUsd(track.lastPriceUsd)})</span>
+                ) : null}
                 {priceDelta ? (
                   <span className={priceDelta.pct < 0 ? " text-saved" : " text-warn"}>
                     {" "}· {priceDelta.label}
@@ -104,14 +131,14 @@ export function ItemCard({
         </div>
         {item.note ? <p className="mt-3 text-sm leading-relaxed text-muted">{item.note}</p> : null}
 
-        {track?.dealUrl ? (
+        {track?.dealUrl && dealLabel ? (
           <a
             href={track.dealUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-2 inline-block text-xs font-medium text-fg underline-offset-2 hover:underline"
           >
-            Zobacz deal na CheapShark →
+            {dealLabel}
           </a>
         ) : null}
 
