@@ -58,7 +58,7 @@ export const PLANS: Record<
       "Stałe 48 godzin oddechu",
       "Werdykt: kupuję albo odpuszczam",
       "Historia decyzji",
-      "Ceny gier + elektroniki / ubrań",
+      "Ceny Steam + sklepy PC + elektronika",
     ],
   },
   plus_month: {
@@ -74,7 +74,7 @@ export const PLANS: Record<
       "Czas oddechu od 24 h do 30 dni",
       "Raport i cel oszczędności",
       "Przelicznik na godziny pracy",
-      "Śledzenie cen + alerty spadków",
+      "Śledzenie cen Steam + alerty spadków",
     ],
   },
   plus_year: {
@@ -95,15 +95,16 @@ export const FREE_WAIT_HOURS = 48;
 export type ItemStatus = "waiting" | "bought" | "skipped";
 
 export type PriceTrack = {
-  source: "cheapshark" | "upcitemdb";
+  source: "steam" | "cheapshark" | "upcitemdb";
   gameId: string;
   title: string;
   lastPriceUsd: number;
   lastPriceGrosze: number;
   lastChecked: string;
-  history: { at: string; priceUsd: number }[];
+  history: { at: string; priceUsd: number; priceGrosze?: number }[];
   dealUrl?: string;
   thumb?: string;
+  steamAppId?: string;
 };
 
 export type WaitItem = {
