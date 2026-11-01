@@ -18,7 +18,6 @@ import {
   makePriceTrack,
   searchPrices,
   shopSearchLinks,
-  usdToGrosze,
   type PriceResult,
 } from "@/lib/prices";
 import { cn } from "@/lib/utils";
@@ -37,6 +36,12 @@ export const Route = createFileRoute("/nowe")({
   }),
   component: NowePage,
 });
+
+function sourceLabel(source: PriceResult["source"]): string {
+  if (source === "steam") return "Steam";
+  if (source === "cheapshark") return "inne sklepy PC";
+  return "katalog";
+}
 
 function NowePage() {
   const navigate = useNavigate();
@@ -62,7 +67,6 @@ function NowePage() {
   const [priceResults, setPriceResults] = useState<PriceResult[] | null>(null);
   const [selectedTrack, setSelectedTrack] = useState<PriceTrack | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [lastSource, setLastSource] = useState<string | null>(null);
 
   const amountGroszePreview = parseAmountToGrosze(amount);
   const smartHours =
@@ -88,17 +92,13 @@ function NowePage() {
     setSearchError(null);
     setPriceResults(null);
     setSelectedTrack(null);
-    setLastSource(null);
     try {
       const results = await searchPrices(q, category);
       setPriceResults(results);
       if (results.length === 0) {
         setSearchError(
-          "Brak wyników w katalogach. Sprawdź Allegro/Ceneo poniżej albo wpisz cenę ręcznie.",
+          "Brak wyników. Sprawdź Steam / Allegro / Ceneo poniżej albo wpisz cenę ręcznie.",
         );
-      } else {
-        const src = results[0]?.source;
-        setLastSource(src === "cheapshark" ? "CheapShark (gry PC)" : "katalog produktów (orientacyjnie)");
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Błąd sieci";
@@ -112,14 +112,14 @@ function NowePage() {
     const track = makePriceTrack(r);
     setSelectedTrack(track);
     setTitle(r.title);
-    const grosze = usdToGrosze(r.cheapestPriceUsd);
-    setAmount((grosze / 100).toFixed(grosze % 100 === 0 ? 0 : 2));
-    if (r.source === "cheapshark" && category === "inne") setCategory("hobby");
+    setAmount((r.priceGrosze / 100).toFixed(r.priceGrosze % 100 === 0 ? 0 : 2));
+    if ((r.source === "steam" || r.source === "cheapshark") && category === "inne") {
+      setCategory("hobby");
+    }
     if (r.source === "upcitemdb" && category === "inne") {
-      // leave category or set elektronika as default for gadgets
       setCategory("elektronika");
     }
-    if (plus) setWaitHours(suggestedWaitHours(grosze));
+    if (plus) setWaitHours(suggestedWaitHours(r.priceGrosze));
   }
 
   function onSubmit(e: FormEvent) {
@@ -194,7 +194,7 @@ function NowePage() {
             setSelectedTrack(null);
             setPriceResults(null);
           }}
-          placeholder="np. GTA 5, AirPods, Nike, kurtka"
+          placeholder="np. Wiedźmin 3, GTA 5, AirPods"
         />
       </label>
 
@@ -234,9 +234,7 @@ function NowePage() {
 
       {priceResults && priceResults.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-sm text-muted">
-            Wyniki{lastSource ? ` · ${lastSource}` : ""} (najniższa / orientacyjna):
-          </p>
+          <p className="text-sm text-muted">Wyniki (najtańsze najpierw):</p>
           <ul className="space-y-2">
             {priceResults.map((r) => {
               const selected = selectedTrack?.gameId === r.gameId;
@@ -252,16 +250,36 @@ function NowePage() {
                         : "border-line bg-surface hover:bg-elevated",
                     )}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium line-clamp-2">
-                        {r.brand ? `${r.brand} · ` : ""}
-                        {r.title}
-                      </span>
-                      <span className="shrink-0 text-sm font-semibold">
-                        {formatUsd(r.cheapestPriceUsd)}
-                        <span className={cn("ml-1 text-xs", selected ? "opacity-70" : "text-muted")}>
-                          (~{formatZl(usdToGrosze(r.cheapestPriceUsd))})
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="text-sm font-medium line-clamp-2">
+                          {r.brand ? `${r.brand} · ` : ""}
+                          {r.title}
                         </span>
+                        <span
+                          className={cn(
+                            "mt-0.5 block text-2xs",
+                            selected ? "opacity-70" : "text-subtle",
+                          )}
+                        >
+                          {sourceLabel(r.source)}
+                          {r.discountPercent
+                            ? ` · −${r.discountPercent}%`
+                            : ""}
+                        </span>
+                      </div>
+                      <span className="shrink-0 text-right text-sm font-semibold">
+                        {formatZl(r.priceGrosze)}
+                        {r.currency === "USD" ? (
+                          <span
+                            className={cn(
+                              "mt-0.5 block text-2xs font-normal",
+                              selected ? "opacity-70" : "text-muted",
+                            )}
+                          >
+                            {formatUsd(r.cheapestPriceUsd)}
+                          </span>
+                        ) : null}
                       </span>
                     </div>
                   </button>
@@ -271,9 +289,9 @@ function NowePage() {
           </ul>
           {selectedTrack ? (
             <p className="text-xs text-saved">
-              {selectedTrack.source === "cheapshark"
-                ? "Śledzenie ceny włączone — alert przy spadku/wzroście (gry)."
-                : "Cena orientacyjna z katalogu — porównaj na Allegro/Ceneo i popraw kwotę jeśli trzeba."}
+              {selectedTrack.source === "steam" || selectedTrack.source === "cheapshark"
+                ? "Śledzenie ceny włączone — przy otwarciu aplikacji sprawdzimy spadki/wzrosty."
+                : "Cena orientacyjna — porównaj w sklepach i popraw kwotę jeśli trzeba."}
             </p>
           ) : null}
         </div>
@@ -296,7 +314,7 @@ function NowePage() {
             const g = parseAmountToGrosze(e.target.value);
             if (plus && g != null) setWaitHours(suggestedWaitHours(g));
           }}
-          placeholder="np. 899"
+          placeholder="np. 149,99"
         />
       </label>
 
@@ -354,9 +372,8 @@ function NowePage() {
       </Button>
 
       <p className="text-2xs leading-relaxed text-subtle">
-        Gry PC: CheapShark (Steam i inne). Elektronika / ubrania / reszta: katalog UPCitemdb
-        (ceny orientacyjne w USD, przeliczone ~3,85 zł/$). Zawsze możesz poprawić kwotę i
-        sprawdzić Allegro / Ceneo / OLX.
+        Gry: <strong>Steam</strong> (ceny w zł, sklep PL) + CheapShark (inne sklepy PC).
+        Elektronika / ubrania: katalog orientacyjny. Link do oferty Steam przy śledzeniu.
       </p>
     </form>
   );
