@@ -1,6 +1,24 @@
 # Zanim
 
-Poczekalnia zakupów — odczekaj 48 godzin, zanim wydasz pieniądze.
+Poczekalnia zakupów — odczekaj, zanim wydasz pieniądze.
+
+Sklepy krzyczą „kup teraz”. Zanim jest pauzą: wrzucasz rzecz, odczekujesz, i dopiero wtedy decydujesz — z chłodną głową.
+
+## Co robi Zanim
+
+1. **Wrzucasz chęć** — słuchawki, kurtka, weekend. Kwota, kategoria, tyle.
+2. **Odczekujesz** — domyślnie 48 godzin. Plus pozwala ustawić od doby do miesiąca.
+3. **Werdykt** — kupujesz albo odpuszczasz. Widzisz, ile godzin twojej pracy to było i ile zostało w kieszeni.
+
+## Plan Plus (9 zł / mies. lub 79 zł / rok)
+
+Oprócz braku limitu i własnego czasu oddechu, Plus daje spokojną analizę przed decyzją:
+
+- **Analiza zakupu** — produkt, cena, powód
+- **Ocena potrzeby** — pomaga odróżnić prawdziwą potrzebę od chwilowej zachcianki
+- **Alternatywy** — tańsze rozwiązania, gdy mają sens
+- **Personalizacja** — poznaje Twój sposób podejmowania decyzji
+- **Podsumowania miesięczne** — ile wydałeś, ile zaoszczędziłeś, z czego zrezygnowałeś
 
 ## Uruchomienie lokalne
 
