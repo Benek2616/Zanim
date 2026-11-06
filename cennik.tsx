@@ -31,7 +31,8 @@ function Cennik() {
         Płać jak za kawę, nie jak za SaaS z Doliny.
       </h1>
       <p className="mt-3 text-sm leading-relaxed text-muted">
-        Darmowy plan nie znika. Plus to 9 zł miesięcznie albo 79 zł za cały rok.
+        Darmowy plan nie znika. Plus to 9 zł miesięcznie albo 79 zł za cały rok —
+        i spokojna analiza, zanim podejmiesz decyzję.
       </p>
       <ul className="mt-4 flex flex-wrap gap-2">
         {["Karta", "Apple Pay", "Google Pay", "BLIK"].map((m) => (
