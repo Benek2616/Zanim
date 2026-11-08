@@ -33,6 +33,19 @@ function shiftMonth(key: string, delta: number): string {
   return monthKey(new Date(y ?? 2026, (m ?? 1) - 1 + delta, 1));
 }
 
+function monthlyComment(skipped: number, bought: number, skippedZl: number): string {
+  if (skipped === 0 && bought === 0) {
+    return "W tym miesiącu jeszcze nie ma decyzji. Odczekaj i zobacz, co naprawdę warto.";
+  }
+  if (skippedZl > 500) {
+    return `Dobrze. ${formatZl(skippedZl)} zostało w kieszeni. To już coś.`;
+  }
+  if (skipped > bought) {
+    return "Więcej odpuszczonych niż kupionych. Spokojne tempo.";
+  }
+  return "Decyzje są. Z czasem będzie widać, w których kategoriach najczęściej warto poczekać.";
+}
+
 function Raport() {
   const items = useZanim((s) => s.items);
   const entitlements = useZanim((s) => s.entitlements);
@@ -97,6 +110,12 @@ function Raport() {
     );
   }
 
+  const comment = monthlyComment(
+    stats.monthSkipped.length,
+    stats.monthBought.length,
+    stats.monthSkippedSum,
+  );
+
   return (
     <div className="rise-in pb-8">
       <p className="text-2xs font-medium tracking-mark text-subtle uppercase">Raport</p>
@@ -140,6 +159,8 @@ function Raport() {
           <p className="mt-1 text-xs text-accent-fg/60">to, czego nie kupiłaś / nie kupiłeś</p>
         </div>
       </div>
+
+      <p className="mt-4 text-sm leading-relaxed text-muted">{comment}</p>
 
       <section className="mt-8">
         <h2 className="font-serif text-lg font-medium">Co zdecydowałaś / zdecydowałeś</h2>
