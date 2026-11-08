@@ -71,6 +71,19 @@ function Home() {
         <Stat label="Plan" value={planLabel} />
       </div>
 
+      {plus ? (
+        <p className="mt-4 text-sm text-muted">
+          W Plusie przy każdej rzeczy możesz otworzyć analizę: ocena potrzeby, pytania do siebie i propozycje alternatyw.
+        </p>
+      ) : (
+        <p className="mt-4 text-center text-xs text-subtle">
+          Plus daje analizę zakupu, ocenę potrzeby i miesięczne podsumowania.{" "}
+          <Link to="/cennik" className="font-medium text-fg underline-offset-2 hover:underline">
+            Zobacz Plus
+          </Link>
+        </p>
+      )}
+
       {perm === "default" ? (
         <div className="mt-5 flex items-center justify-between gap-3 rounded-lg bg-fg px-4 py-3 text-accent-fg">
           <p className="text-sm leading-snug">Włącz powiadomienia — damy znać, gdy czas minie.</p>
@@ -127,6 +140,7 @@ function Home() {
               onDecide={decide}
               onExtend={extend}
               onDelete={remove}
+              showAnalysis={plus}
             />
           ))}
         </ul>
