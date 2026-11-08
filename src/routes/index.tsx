@@ -70,7 +70,6 @@ function Home() {
     return () => window.clearInterval(id);
   }, []);
 
-  // Odśwież ceny śledzonych gier przy wejściu na stronę (max raz na sesję)
   useEffect(() => {
     const key = "zanim.prices-refreshed";
     try {
@@ -134,6 +133,19 @@ function Home() {
           Rzeczy, które mogą poczekać
         </h1>
       </div>
+
+      {plus ? (
+        <p className="mt-3 text-sm text-muted">
+          Przy każdej rzeczy możesz otworzyć analizę: pytania o potrzebę i propozycje alternatyw.
+        </p>
+      ) : (
+        <p className="mt-3 text-center text-xs text-subtle">
+          Plus daje analizę zakupu i więcej spokoju.{" "}
+          <Link to="/cennik" className="font-medium text-fg underline-offset-2 hover:underline">
+            Zobacz Plus
+          </Link>
+        </p>
+      )}
 
       <div className="rise-in-2 mt-4 overflow-hidden rounded-2xl border border-line/60 bg-fg px-4 py-4 text-accent-fg shadow-soft">
         <p className="text-2xs font-semibold uppercase tracking-mark text-accent-fg/60">{tip.tag}</p>
@@ -298,6 +310,7 @@ function Home() {
                 onSkip={(reason) => onSkip(item.id, reason)}
                 onExtend={() => extend(item.id)}
                 onRemove={() => remove(item.id)}
+                showAnalysis={plus}
               />
             </li>
           ))}
