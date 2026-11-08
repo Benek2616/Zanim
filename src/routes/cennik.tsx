@@ -43,11 +43,12 @@ function CennikPage() {
           <p className="text-sm font-medium">0 zł · za konto</p>
         </div>
         <p className="mt-2 text-sm text-accent-fg/75">
-          Załóż konto w apce — od razu bez limitu i z własnym czasem oddechu.
+          Załóż konto w apce — od razu bez limitu, z własnym czasem i analizą.
         </p>
         <ul className="mt-4 space-y-1.5 text-sm text-accent-fg/90">
           <li>• Bez limitu rzeczy w poczekalni</li>
           <li>• Czas oddechu od 24 h do 30 dni</li>
+          <li>• Analiza zakupu i pytania o potrzebę</li>
           <li>• Raport, cel, passa, godziny pracy</li>
         </ul>
         {plus && hasAccount ? (
