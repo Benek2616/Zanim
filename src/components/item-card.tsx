@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { analyzeItem } from "@/lib/ai-analysis";
 import {
   categoryLabel,
   formatHours,
@@ -21,6 +22,7 @@ export function ItemCard({
   onSkip,
   onExtend,
   onRemove,
+  showAnalysis,
 }: {
   item: WaitItem;
   now: number;
@@ -29,8 +31,10 @@ export function ItemCard({
   onSkip: (reason?: SkipReasonId) => void;
   onExtend: () => void;
   onRemove?: () => void;
+  showAnalysis?: boolean;
 }) {
   const [pickingReason, setPickingReason] = useState(false);
+  const [openAnalysis, setOpenAnalysis] = useState(false);
   const readyAt = new Date(item.readyAt).getTime();
   const ready = now >= readyAt;
   const remaining = readyAt - now;
@@ -41,6 +45,7 @@ export function ItemCard({
     profile.monthlyIncomeGrosze,
     profile.monthlyHours,
   );
+  const analysis = showAnalysis ? analyzeItem(item) : null;
 
   const track = item.priceTrack;
   let priceDelta: { pct: number; label: string } | null = null;
@@ -130,6 +135,50 @@ export function ItemCard({
           </span>
         </div>
         {item.note ? <p className="mt-3 text-sm leading-relaxed text-muted">{item.note}</p> : null}
+
+        {showAnalysis && analysis ? (
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setOpenAnalysis((o) => !o)}
+              className="text-xs font-medium text-fg underline-offset-2 hover:underline"
+            >
+              {openAnalysis ? "Ukryj analizę" : "Pokaż analizę"}
+            </button>
+            {openAnalysis ? (
+              <div className="mt-2 space-y-2 rounded-lg bg-elevated p-3 text-sm">
+                <p className="font-medium">
+                  {analysis.verdict === "warto"
+                    ? "Warto rozważyć"
+                    : analysis.verdict === "poczekaj"
+                      ? "Lepiej poczekać"
+                      : "Zastanów się spokojnie"}
+                </p>
+                <p className="text-muted">{analysis.summary}</p>
+                {analysis.questions.length > 0 ? (
+                  <div>
+                    <p className="text-xs font-medium text-subtle">Pytania do siebie</p>
+                    <ul className="mt-1 list-disc pl-4 text-muted">
+                      {analysis.questions.map((q) => (
+                        <li key={q}>{q}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {analysis.alternatives.length > 0 ? (
+                  <div>
+                    <p className="text-xs font-medium text-subtle">Alternatywy</p>
+                    <ul className="mt-1 list-disc pl-4 text-muted">
+                      {analysis.alternatives.map((a) => (
+                        <li key={a}>{a}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {track?.dealUrl && dealLabel ? (
           <a
