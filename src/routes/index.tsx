@@ -136,13 +136,13 @@ function Home() {
 
       {plus ? (
         <p className="mt-3 text-sm text-muted">
-          Przy każdej rzeczy możesz otworzyć analizę: pytania o potrzebę i propozycje alternatyw.
+          Przy każdej rzeczy możesz otworzyć analizę AI: pytania o potrzebę i propozycje alternatyw.
         </p>
       ) : (
         <p className="mt-3 text-center text-xs text-subtle">
-          Plus daje analizę zakupu i więcej spokoju.{" "}
+          Plus z analizą AI — 9,99 zł / mies. lub 79,99 zł / rok.{" "}
           <Link to="/cennik" className="font-medium text-fg underline-offset-2 hover:underline">
-            Zobacz Plus
+            Zobacz cennik
           </Link>
         </p>
       )}
