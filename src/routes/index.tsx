@@ -306,6 +306,7 @@ function Home() {
                 item={item}
                 now={now}
                 profile={profile}
+                history={items}
                 onBuy={() => decide(item.id, "bought")}
                 onSkip={(reason) => onSkip(item.id, reason)}
                 onExtend={() => extend(item.id)}
