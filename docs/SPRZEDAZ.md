@@ -1,11 +1,25 @@
-# Modele monetyzacji (na później)
+# Modele monetyzacji
 
-Obecnie **nie ma płatności**. Plan Plus jest darmowy po **założeniu konta** (dane lokalnie na urządzeniu).
+## Obecny stan
 
-Gdy będziesz gotów na firmę i obrót:
+- **Darmowy**: 0 zł — 5 rzeczy, 48 h, podstawowy werdykt.
+- **Plus**: **9,99 zł / miesiąc** lub **79,99 zł / rok**.
+- Analiza AI, brak limitu, własny czas, raporty — w Plusie.
 
-1. Supabase / inne konto użytkownika w chmurze
-2. Stripe / P24 + faktury
-3. Regulamin płatności i dane sprzedawcy
+Płatności Stripe nie są jeszcze podłączone. UI i plany są gotowe.
 
-Do tego czasu nie zakładaj subskrypcji ani nie zbieraj kart.
+## Co trzeba zrobić, żeby Plus naprawdę monetyzował
+
+1. Stripe — produkty + price ID (już w `.env.example`).
+2. Endpoint checkout + webhook.
+3. W `konto.tsx` przyciski „Wykup Plus” zamiast darmowego konta.
+4. Regulamin płatności i dane sprzedawcy.
+
+## Synchronizacja
+
+Dane są lokalne. Do sync między urządzeniami:
+
+- Supabase Auth + tabele `items` / `profiles` / `entitlements`.
+- Sync przy starcie i po zmianach.
+
+Szczegóły w `docs/ROADMAP.md`.
