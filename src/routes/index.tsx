@@ -101,6 +101,7 @@ function Home() {
   const goal = profile.savingsGoalGrosze;
   const goalPct =
     goal && goal > 0 ? Math.min(100, Math.round((skippedSum / goal) * 100)) : null;
+  const remaining = goal ? Math.max(0, goal - skippedSum) : null;
 
   const visible = useMemo(() => {
     if (filter === "ready") return ready;
@@ -190,7 +191,7 @@ function Home() {
         />
       </div>
 
-      {goalPct != null && goal ? (
+      {goalPct != null && goal && remaining != null ? (
         <div className="mt-4 rounded-2xl border border-line/60 bg-surface p-4 shadow-card">
           <div className="flex items-center justify-between gap-2 text-sm">
             <span className="font-medium">Cel oszczędności</span>
@@ -205,7 +206,9 @@ function Home() {
             />
           </div>
           <p className="mt-2 text-xs text-muted">
-            {goalPct >= 100 ? "Cel osiągnięty — pięknie." : `Postęp: ${goalPct}%`}
+            {goalPct >= 100
+              ? "Cel osiągnięty — pięknie."
+              : `Zostało ${formatZl(remaining)}`}
           </p>
         </div>
       ) : null}
