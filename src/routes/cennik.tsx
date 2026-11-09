@@ -1,12 +1,40 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import { isPlusActive, useZanim } from "@/lib/store";
 import { PLANS } from "@/lib/zanim";
 
 export const Route = createFileRoute("/cennik")({ component: CennikPage });
 
+async function startCheckout(plan: "month" | "year") {
+  const res = await fetch("/api/create-checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ plan }),
+  });
+  const data = (await res.json()) as { ok?: boolean; url?: string; error?: string };
+  if (data.url) {
+    window.location.href = data.url;
+    return;
+  }
+  throw new Error(data.error || "Nie udało się rozpocząć płatności.");
+}
+
 function CennikPage() {
   const entitlements = useZanim((s) => s.entitlements);
   const plus = isPlusActive(entitlements);
+  const [loading, setLoading] = useState<"month" | "year" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function buy(plan: "month" | "year") {
+    setError(null);
+    setLoading(plan);
+    try {
+      await startCheckout(plan);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Błąd płatności.");
+      setLoading(null);
+    }
+  }
 
   return (
     <div className="rise-in space-y-6 pb-6">
@@ -18,6 +46,10 @@ function CennikPage() {
           z analizą AI przed decyzją.
         </p>
       </div>
+
+      {error ? (
+        <p className="rounded-lg bg-warn/10 px-3 py-2 text-sm text-warn">{error}</p>
+      ) : null}
 
       <article className="rounded-2xl border border-line/60 bg-surface p-5 shadow-card">
         <div className="flex items-baseline justify-between gap-3">
@@ -45,12 +77,14 @@ function CennikPage() {
           ))}
         </ul>
         <div className="mt-4">
-          <Link
-            to="/konto"
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-accent-fg px-4 text-sm font-semibold text-fg"
+          <button
+            type="button"
+            disabled={loading !== null}
+            onClick={() => void buy("month")}
+            className="inline-flex h-11 items-center justify-center rounded-xl bg-accent-fg px-4 text-sm font-semibold text-fg disabled:opacity-60"
           >
-            Wybierz Plus
-          </Link>
+            {loading === "month" ? "Przekierowuję…" : "Wykup Plus"}
+          </button>
         </div>
       </article>
 
@@ -66,18 +100,19 @@ function CennikPage() {
           ))}
         </ul>
         <div className="mt-4">
-          <Link
-            to="/konto"
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-fg px-4 text-sm font-semibold text-accent-fg"
+          <button
+            type="button"
+            disabled={loading !== null}
+            onClick={() => void buy("year")}
+            className="inline-flex h-11 items-center justify-center rounded-xl bg-fg px-4 text-sm font-semibold text-accent-fg disabled:opacity-60"
           >
-            Wybierz rok
-          </Link>
+            {loading === "year" ? "Przekierowuję…" : "Wykup rok"}
+          </button>
         </div>
       </article>
 
       <p className="text-xs leading-relaxed text-muted">
-        Płatności (Stripe / BLIK / Apple Pay) podłączymy, gdy będziesz gotowy. Na razie plany są opisane
-        — funkcje AI działają lokalnie dla testów.
+        Płatność przez Stripe (karta, BLIK, Apple Pay). Po zaksięgowaniu Plus aktywuje się automatycznie.
       </p>
     </div>
   );
