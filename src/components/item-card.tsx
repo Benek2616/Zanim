@@ -23,6 +23,7 @@ export function ItemCard({
   onExtend,
   onRemove,
   showAnalysis,
+  history = [],
 }: {
   item: WaitItem;
   now: number;
@@ -32,6 +33,7 @@ export function ItemCard({
   onExtend: () => void;
   onRemove?: () => void;
   showAnalysis?: boolean;
+  history?: WaitItem[];
 }) {
   const [pickingReason, setPickingReason] = useState(false);
   const [openAnalysis, setOpenAnalysis] = useState(false);
@@ -45,7 +47,7 @@ export function ItemCard({
     profile.monthlyIncomeGrosze,
     profile.monthlyHours,
   );
-  const analysis = showAnalysis ? analyzeItem(item) : null;
+  const analysis = showAnalysis ? analyzeItem(item, history) : null;
 
   const track = item.priceTrack;
   let priceDelta: { pct: number; label: string } | null = null;
@@ -143,7 +145,7 @@ export function ItemCard({
               onClick={() => setOpenAnalysis((o) => !o)}
               className="text-xs font-medium text-fg underline-offset-2 hover:underline"
             >
-              {openAnalysis ? "Ukryj analizę" : "Pokaż analizę"}
+              {openAnalysis ? "Ukryj analizę AI" : "Pokaż analizę AI"}
             </button>
             {openAnalysis ? (
               <div className="mt-2 space-y-2 rounded-lg bg-elevated p-3 text-sm">
@@ -155,6 +157,9 @@ export function ItemCard({
                       : "Zastanów się spokojnie"}
                 </p>
                 <p className="text-muted">{analysis.summary}</p>
+                {analysis.insight ? (
+                  <p className="text-xs italic text-subtle">{analysis.insight}</p>
+                ) : null}
                 {analysis.questions.length > 0 ? (
                   <div>
                     <p className="text-xs font-medium text-subtle">Pytania do siebie</p>
