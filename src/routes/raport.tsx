@@ -8,6 +8,7 @@ import {
   formatHours,
   formatZl,
   hoursOfWork,
+  SKIP_REASONS,
   skipStreakDays,
 } from "@/lib/zanim";
 
@@ -27,6 +28,7 @@ function RaportPage() {
   const goal = profile.savingsGoalGrosze;
   const goalPct =
     goal && goal > 0 ? Math.min(100, Math.round((skippedSum / goal) * 100)) : null;
+  const remaining = goal ? Math.max(0, goal - skippedSum) : null;
 
   const byCategory = useMemo(() => {
     const map = new Map<string, number>();
@@ -38,9 +40,20 @@ function RaportPage() {
       .sort((a, b) => b.sum - a.sum);
   }, [skipped]);
 
-  const shareText = `Dzięki Zanim odpuściłam/em zakupy na ${formatZl(skippedSum)}${
+  const byReason = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const i of skipped) {
+      if (i.skipReason) map.set(i.skipReason, (map.get(i.skipReason) ?? 0) + 1);
+    }
+    return SKIP_REASONS.map((r) => ({ id: r.id, label: r.label, count: map.get(r.id) ?? 0 }))
+      .filter((r) => r.count > 0)
+      .sort((a, b) => b.count - a.count);
+  }, [skipped]);
+
+  const topReason = byReason[0];
+  const shareText = `Dzięki Zanim odpuściłem zakupy na ${formatZl(skippedSum)}${
     hours != null ? ` (ok. ${formatHours(hours)} pracy)` : ""
-  }. Passa: ${streak} d.`;
+  }.${topReason ? ` Najczęściej: ${topReason.label.toLowerCase()}.` : ""} Passa: ${streak} d.`;
 
   async function share() {
     try {
@@ -113,9 +126,33 @@ function RaportPage() {
             <div className="h-full rounded-full bg-saved" style={{ width: `${goalPct}%` }} />
           </div>
           <p className="mt-2 text-xs text-muted">
-            {goalPct >= 100 ? "Cel osiągnięty." : `Zostało ${formatZl(Math.max(0, goal - skippedSum))}`}
+            {goalPct >= 100
+              ? "Cel osiągnięty — pięknie."
+              : `Zostało ${formatZl(remaining!)}`}
           </p>
         </div>
+      ) : null}
+
+      {byReason.length > 0 ? (
+        <section>
+          <h2 className="font-serif text-lg font-medium">Dlaczego odpuszczasz</h2>
+          <ul className="mt-3 space-y-2">
+            {byReason.map((r) => (
+              <li
+                key={r.id}
+                className="flex items-center justify-between rounded-xl bg-surface px-3 py-3 text-sm shadow-card"
+              >
+                <span>{r.label}</span>
+                <span className="font-medium text-muted">{r.count}×</span>
+              </li>
+            ))}
+          </ul>
+          {topReason ? (
+            <p className="mt-2 text-xs text-muted">
+              Najczęściej: <strong className="text-fg">{topReason.label}</strong>
+            </p>
+          ) : null}
+        </section>
       ) : null}
 
       {byCategory.length > 0 ? (
