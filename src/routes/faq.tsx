@@ -9,15 +9,15 @@ const ITEMS = [
   },
   {
     q: "Czy to kosztuje?",
-    a: "Nie. Plan darmowy działa od razu. Plus odblokowujesz zakładając konto w apce — bez karty i bez subskrypcji.",
+    a: "Plan darmowy działa od razu. Plus odblokowujesz zakładając konto w aplikacji — bez karty i bez subskrypcji. W przyszłości płatności w sklepach (Google Play / App Store) będą przez ich systemy.",
   },
   {
     q: "Gdzie są moje dane?",
-    a: "Na tym urządzeniu (w przeglądarce). Nie wysyłamy listy zakupów na nasz serwer. Możesz zrobić kopię w Więcej → Dane.",
+    a: "Lista zakupów, kwoty i decyzje zostają na tym urządzeniu. Imię i e-mail z konta oraz anonimowe dane o wizytach zapisujemy w bazie (Supabase). Możesz zrobić kopię lokalną w Więcej → Dane.",
   },
   {
     q: "Co daje konto / Plus?",
-    a: "Bez limitu rzeczy w poczekalni oraz własny czas oddechu (od 24 h do 30 dni).",
+    a: "Bez limitu rzeczy w poczekalni oraz własny czas oddechu (od 24 h do 30 dni). Plus jest obecnie darmowy po założeniu konta.",
   },
   {
     q: "Czy to zastąpi psychoterapię?",
