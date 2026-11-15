@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { setupPwa } from "@/lib/pwa";
 import { useZanim } from "@/lib/store";
 import { trackVisit } from "@/lib/analytics";
+import { schedulePushSync } from "@/lib/push/client";
 
 const TABS = [
   { to: "/", label: "Poczekalnia", icon: Hourglass },
@@ -20,7 +21,7 @@ function isTabActive(to: string, pathname: string): boolean {
   if (to === "/") return pathname === "/";
   if (to === "/cennik") return pathname === "/cennik";
   if (to === "/raport") return pathname === "/raport";
-  return ["/konto", "/opinie", "/na-telefon", "/prywatnosc", "/regulamin", "/faq"].includes(
+  return ["/konto", "/opinie", "/na-telefon", "/prywatnosc", "/regulamin", "/faq", "/powiadomienia"].includes(
     pathname,
   );
 }
@@ -37,6 +38,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const onboardingDone = useZanim((s) => s.onboardingDone);
   const darkMode = useZanim((s) => s.darkMode);
   const markHydrated = useZanim((s) => s.markHydrated);
+  const items = useZanim((s) => s.items);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const lastTracked = useRef<string | null>(null);
 
@@ -50,6 +52,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     applyDarkClass(darkMode);
   }, [darkMode]);
+
+  // Powiadomienia push: aktywność + minimalne dane (wg włączonych kategorii) — z opóźnieniem
+  useEffect(() => {
+    if (!hydrated) return;
+    schedulePushSync(items);
+  }, [hydrated, items]);
 
   // Tracking wizyt (max 1× na ścieżkę w danej sesji komponentu)
   useEffect(() => {
