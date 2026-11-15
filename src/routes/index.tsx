@@ -3,12 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import { ItemCard } from "@/components/item-card";
 import { PauseBars } from "@/components/pause-bars";
 import { Button } from "@/components/ui/button";
-import {
-  notificationPermission,
-  notifyReady,
-  requestNotifications,
-  setAppBadge,
-} from "@/lib/notify";
+import { PushPrompt } from "@/components/push-prompt";
+import { notifyReady, setAppBadge } from "@/lib/notify";
+import { usePush } from "@/lib/push/client";
 import { isPlusActive, useZanim } from "@/lib/store";
 import {
   formatZl,
@@ -54,11 +51,30 @@ function Home() {
   const remove = useZanim((s) => s.remove);
   const refreshTrackedPrices = useZanim((s) => s.refreshTrackedPrices);
   const [now, setNow] = useState(() => Date.now());
-  const [filter, setFilter] = useState<Filter>("all");
+  // Deep link z powiadomienia: /?item=<id> albo /?filter=ready
+  const [filter, setFilter] = useState<Filter>(() => {
+    if (typeof window === "undefined") return "all";
+    const f = new URLSearchParams(window.location.search).get("filter");
+    return f === "ready" || f === "waiting" ? f : "all";
+  });
   const [tipIndex, setTipIndex] = useState(0);
-  const [perm, setPerm] = useState(() =>
-    typeof window === "undefined" ? "default" : notificationPermission(),
+  const pushEnabled = usePush((s) => s.enabled && s.serverOk);
+  const [highlightId, setHighlightId] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("item"),
   );
+
+  useEffect(() => {
+    const itemId = new URLSearchParams(window.location.search).get("item");
+    if (!itemId) return;
+    const t1 = window.setTimeout(() => {
+      document.getElementById(`item-${itemId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 250);
+    const t2 = window.setTimeout(() => setHighlightId(null), 4000);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, []);
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
@@ -111,6 +127,8 @@ function Home() {
 
   useEffect(() => {
     setAppBadge(ready.length);
+    // Gdy działają powiadomienia push z serwera, nie dublujemy lokalnych.
+    if (pushEnabled) return;
     notifyReady(
       ready.map((item) => ({
         id: item.id,
@@ -118,7 +136,7 @@ function Home() {
         amountLabel: formatZl(item.amountGrosze),
       })),
     );
-  }, [ready]);
+  }, [ready, pushEnabled]);
 
   const tip = TIPS[tipIndex];
 
@@ -224,19 +242,7 @@ function Home() {
         </div>
       ) : null}
 
-      {perm === "default" ? (
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 py-3 shadow-card">
-          <p className="text-sm leading-snug text-muted">
-            Włącz powiadomienia — damy znać, gdy czas minie lub spadnie cena.
-          </p>
-          <Button
-            size="sm"
-            onClick={() => void requestNotifications().then(() => setPerm(notificationPermission()))}
-          >
-            Włącz
-          </Button>
-        </div>
-      ) : null}
+      <PushPrompt itemsCount={items.length} />
 
       {waiting.length > 0 ? (
         <div className="mt-5 flex gap-1.5 rounded-xl bg-elevated/70 p-1">
@@ -302,7 +308,11 @@ function Home() {
           {visible.map((item, i) => (
             <li
               key={item.id}
-              className="rise-in"
+              id={`item-${item.id}`}
+              data-highlight={highlightId === item.id ? "true" : undefined}
+              className={`rise-in rounded-2xl transition-shadow duration-500 ${
+                highlightId === item.id ? "ring-2 ring-saved ring-offset-2 ring-offset-bg" : ""
+              }`}
               style={{ animationDelay: `${Math.min(i, 6) * 40}ms` }}
             >
               <ItemCard

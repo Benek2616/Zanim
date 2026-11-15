@@ -14,6 +14,7 @@ import {
   UserPlus,
   HelpCircle,
   Share2,
+  Bell,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ import { parseAmountToGrosze } from "@/lib/zanim";
 export const Route = createFileRoute("/konto")({ component: KontoPage });
 
 const MENU = [
+  { to: "/powiadomienia" as const, label: "Powiadomienia", desc: "Co i kiedy przypominamy", icon: Bell },
   { to: "/na-telefon" as const, label: "Na telefon", desc: "Zainstaluj jak aplikację", icon: Smartphone },
   { to: "/cennik" as const, label: "Plan Plus", desc: "Za konto — bez opłat", icon: Sparkles },
   { to: "/faq" as const, label: "Pytania (FAQ)", desc: "Jak działa Zanim", icon: HelpCircle },
@@ -225,7 +227,7 @@ function KontoPage() {
         ) : (
           <div className="mt-3 space-y-2">
             <p className="text-sm text-muted">
-              Imię i e-mail zostają tylko na tym telefonie. Od razu odblokujesz Plus — bez płatności.
+              Imię i e-mail zapiszemy na tym telefonie i w naszej bazie (aktywacja Plus). Od razu odblokujesz Plus — bez płatności.
             </p>
             <input
               className="w-full rounded-xl border border-line bg-bg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-fg/20"
